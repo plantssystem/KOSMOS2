@@ -140,7 +140,7 @@ KOSMOS2 の PRA32-U2/M(Lite)/M(Lite)M(Lite) 対応における根幹思想は次
 
 ## 6. 4レーン構造の概念図（Mermaid）
 
-以下は **KOSMOS2 → PRA32-U2/M(Lite)/M(Lite)M(Lite)** の関係を示した概念図です。
+**KOSMOS2 → PRA32-U2/M(Lite)/M(Lite)M(Lite)** の関係を示した概念図です。
 ```mermaid
 flowchart LR
     subgraph KOSMOS2["KOSMOS2 (RP2350)"]
@@ -169,14 +169,100 @@ flowchart LR
     L3 --> M3 --> P3
     L4 --> M4 --> P4
 ```
-
-###  ポリフォニック時
+##  ポリフォニック時
 
 *   **X = Y = Z = W**
 *   すべて同一パートに流入
 *   ⇒ 最大4音ポリフォニー
 
-***
+## 4-voice アーキテクチャ図（KOSMOS2 → PRA32-U2M ×4）
+```mermaid
+flowchart LR
+    K[KOSMOS2 Core<br>RP2350]
+
+    subgraph V[4-Voice Synth System]
+        V1["Voice 1<br>PRA32-U2M Lite"]
+        V2["Voice 2<br>PRA32-U2M Lite"]
+        V3["Voice 3<br>PRA32-U2M Lite"]
+        V4["Voice 4<br>PRA32-U2M Lite"]
+    end
+
+    K --> V1
+    K --> V2
+    K --> V3
+    K --> V4
+```
+
+## MIDI ルーティング図（Clock / Link / MIDI Out → 4台）
+```mermaid
+flowchart TD
+    A[KOSMOS2 Core<br>Clock + Note Generator]
+
+    subgraph MIDI[MIDI Output System]
+        C1["USB-MIDI OUT<br>Clock + Note"]
+        C2["MIDI THRU / HUB"]
+    end
+
+    subgraph S[4 Synth Voices]
+        V1["Voice 1<br>PRA32-U2M Lite"]
+        V2["Voice 2<br>PRA32-U2M Lite"]
+        V3["Voice 3<br>PRA32-U2M Lite"]
+        V4["Voice 4<br>PRA32-U2M Lite"]
+    end
+
+    A --> C1 --> C2
+    C2 --> V1
+    C2 --> V2
+    C2 --> V3
+    C2 --> V4
+```
+
+## Passage Engine v2 の内部構造図
+```mermaid
+flowchart LR
+    A[Input Params<br>Scale / Mode / Root / Width / Depth / Jump / Smooth]
+
+    B[Float Position Engine<br>pos += speed]
+    C[Speed Modulator<br>scale-dependent speed / randomness]
+    D[Width & Depth Shaper<br>rotating / wide / deep movement]
+    E[Jump Controller<br>probabilistic jump / trill]
+    F[Note Selector<br>scale quantize + octave model]
+    G[Duration & Velocity Model]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+
+    G --> O[Output Note Event<br>pitch / velocity / duration]
+```
+
+## IO / LCD の状態遷移図
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+
+    Idle --> Play : Start Button
+    Play --> Idle : Stop Button
+
+    Idle --> Menu : Menu Button
+    Play --> Menu : Menu Button (short)
+
+    Menu --> ScaleEdit : Select Scale
+    Menu --> VoiceEdit : Select Voice
+    Menu --> RhythmEdit : Select Rhythm
+    Menu --> System : System Settings
+
+    ScaleEdit --> Menu : Back
+    VoiceEdit --> Menu : Back
+    RhythmEdit --> Menu : Back
+    System --> Menu : Back
+
+    Play --> LiveEdit : Hold Button + Turn Encoder
+    LiveEdit --> Play : Release Button
+```
 
 ## 7. まとめ（設計哲学）
 
