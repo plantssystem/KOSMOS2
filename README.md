@@ -1,5 +1,5 @@
 ***
-# KOSMOS2　仕様書
+# KOSMOS2 4Voice Generative Instrument
 *   **設計は4音ポリフォニック**
 *   **4チャンネル・マルチティンバー**
 *   **1パート＝1音モノフォニック**
