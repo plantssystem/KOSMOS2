@@ -175,7 +175,7 @@ flowchart LR
 *   すべて同一パートに流入
 *   ⇒ 最大4音ポリフォニー
 
-## 4-voice アーキテクチャ図（KOSMOS2 → PRA32-U2M ×4）
+## 4-voice アーキテクチャ図（KOSMOS2 → PRA32-U2M(Lite)）
 ```mermaid
 flowchart LR
     K[KOSMOS2 Core<br>RP2350]
