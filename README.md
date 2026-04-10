@@ -274,4 +274,8 @@ stateDiagram-v2
 
 この構成は **KOSMOS2の思想（Generative / Modular / Layered）** に非常に合っています。
 
+## Special Thanks
+- Powerd by ISGK Instruments PRA32-U2
+- https://github.com/risgk/digital-synth-pra32-u2
+- MATRIXSYNTH
 ***
