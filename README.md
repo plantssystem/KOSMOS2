@@ -140,7 +140,7 @@ KOSMOS2 の PRA32-U2/M(Lite)/M(Lite)M(Lite) 対応における根幹思想は次
 
 ## 6. 4レーン構造の概念図（Mermaid）
 
-**KOSMOS2 → PRA32-U2/M(Lite)/M(Lite)M(Lite)** の関係を示した概念図です。
+**KOSMOS2 → PRA32-U2/M(Lite)** の関係を示した概念図です。
 ```mermaid
 flowchart LR
     subgraph KOSMOS2["KOSMOS2 (RP2350)"]
