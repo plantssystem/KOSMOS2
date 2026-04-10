@@ -138,7 +138,7 @@ KOSMOS2 の PRA32-U2/M(Lite)/M(Lite)M(Lite) 対応における根幹思想は次
 
 ***
 
-## 6. 4レーン構造の概念図（Mermaid）
+## 6. 4レーン構造の概念図
 
 **KOSMOS2 → PRA32-U2/M(Lite)** の関係を示した概念図です。
 ```mermaid
