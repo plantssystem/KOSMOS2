@@ -272,7 +272,71 @@ stateDiagram-v2
 *   ボイス管理を音源側に完全委譲
 *   シンプルで強靭、RP2350向き
 
-この構成は **KOSMOS2の思想（Generative / Modular / Layered）** に非常に合っています。
+## 8. KOSMOS2 CONTROLLER
+
+KOSMOS2 は外部 MIDI コントローラー（TouchOSC）からの操作に対応しています。  
+演奏者はリアルタイムに「密度」「音程」「速度」「スケール」「音量」を操作し、  
+KOSMOS2 の 4 パート（メロディ / ベース / コード / シーケンス）に生命感を与えることができます。
+
+### コントローラー構成（TouchOSC）
+
+KOSMOS2 Controller は以下の 5 つの操作子で構成されています。
+
+| UI Element | MIDI CC | Range | Function |
+|-----------|---------|--------|----------|
+| XYPad (X) | CC20 | 0–127 | **Density（音の密度）**：メロディとシーケンスの発音頻度を制御 |
+| XYPad (Y) | CC21 | 0–127 | **Pitch（音程オフセット）**：メロディの中心音を ±24 半音で変化 |
+| Encoder | CC22 | -63〜+63 | **Speed（速度）**：内部テンポ倍率を相対値で変更 |
+| Scale Buttons | CC23 | 0〜3 | **スケール切替**：0=HEI, 1=MIYA, 2=INSEN, 3=PENTA |
+| Volume Fader | CC7 | 0–127 | **Master Volume**：全パートの出力音量 |
+
+---
+
+### 各コントロールの動作詳細
+
+#### ● Density（CC20）
+- メロディとシーケンスの発音確率を制御  
+- 0 で最小、127 で最大  
+- Passage Engine の「呼吸の速さ」に影響
+
+#### ● Pitch（CC21）
+- メロディの中心音を ±24 半音で変化  
+- スケールは維持されるため破綻しない  
+- ベース・コード・シーケンスは自動追従
+
+#### ● Speed（CC22）
+- 相対値（-63〜+63）で内部テンポを変化  
+- Passage Engine の進行速度に影響  
+- シーケンスの細かさも変化する
+
+#### ● Scale（CC23）
+- KOSMOS2 全パートのスケールを即時切替  
+- HEI / MIYA / INSEN / PENTA の 4 種類  
+- メロディ・ベース・コード・シーケンスが同時に変化
+
+#### ● Volume（CC7）
+- 全パートのマスター音量  
+- PRA32-U2M(Lite) の 2VCO 構成と組み合わせて厚みを調整可能
+
+---
+
+### コントローラーの目的
+
+KOSMOS2 Controller は、  
+**「自律生成される 4 パートの音楽を、演奏者が“手で導く”ためのインターフェイス」**  
+として設計されています。
+
+- メロディ：Passage Engine による自律生成  
+- ベース：低音の安定パターン  
+- コード：1ボイス＋音源側 2VCO による和音の気配  
+- シーケンス：高速アルペジオ
+
+これらを TouchOSC でリアルタイムに操作することで、  
+KOSMOS2 は“多声の生命体”として振る舞います。
+
+## KOSMOS2 CONTROLLER
+
+![KOSMOS2 Controller](docs/screenshots/KOSMOS2_Controller.jpg)
 
 ## Special Thanks
 - MATRIXSYNTH
