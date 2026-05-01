@@ -272,7 +272,7 @@ stateDiagram-v2
 *   ボイス管理を音源側に完全委譲
 *   シンプルで強靭、RP2350向き
 
-## 8. KOSMOS2 CONTROLLER
+# KOSMOS2 CONTROLLER
 
 KOSMOS2 は外部 MIDI コントローラー（TouchOSC）からの操作に対応しています。  
 演奏者はリアルタイムに「密度」「音程」「速度」「スケール」「音量」を操作し、  
