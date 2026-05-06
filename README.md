@@ -145,7 +145,8 @@ stateDiagram-v2
             [*] --> S0
             S0 --> S1 : timer
             S1 --> S2 : timer
-            S2 --> S0 : timer
+            S2 --> S3 : timer
+            S3 --> S0 : timer
         }
 
         %% -------------------------
