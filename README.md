@@ -5,7 +5,7 @@
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -46,9 +46,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U シンセ）
+    %% Core1（PRA32-U2 シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U Synth]
+    Q --> C1[Core1<br/>PRA32-U2 Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -116,7 +116,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U）
+## 🎼 4パート構成（PRA32-U2）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -210,7 +210,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 - Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U Synth Engine（Core1）  
+- PRA32-U2 Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 CONTROLLER
