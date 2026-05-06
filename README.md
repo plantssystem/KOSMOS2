@@ -24,27 +24,44 @@ KOSMOS2 は、
 
 ## 🧩 システム構成図
 
-```
-┌──────────────────────────────────────────────┐
-│                Core0（UI / ロジック）         │
-│----------------------------------------------│
-│ • TouchOSC CC 受信                            │
-│ • パターンエンジン（A/B/C/D）                 │
-│ • ランダマイザ（スケール/トランスポーズ）     │
-│ • MIDI Clock 生成（24ppqn）                   │
-│ • LCD 描画（音色表示 + ノートドット）         │
-│ • USB MIDI 出力                               │
-└───────────────┬──────────────────────────────┘
-                │  MIDI イベントキュー
-┌───────────────▼──────────────────────────────┐
-│              Core1（PRA32-U シンセ）          │
-│----------------------------------------------│
-│ • A パート（Main）                            │
-│ • B パート（Sub Bass）                        │
-│ • C パート（Chord / Lead）                    │
-│ • D パート（Japanese Arp）                    │
-│ • I2S オーディオ出力（48kHz / 16bit）         │
-└──────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+
+    %% ============================
+    %% 外部コントローラー
+    %% ============================
+    TO[TouchOSC<br/>iOS / Android] --> CC[USB-MIDI CC<br/>Density / Pitch / Speed / Scale / Volume / Random / Reset / Mute]
+
+    %% ============================
+    %% Core0（UI + ロジック）
+    %% ============================
+    CC --> C0[Core0<br/>Pico2<br/>UI / Logic]
+
+    C0 --> PAT[Pattern Engine<br/>A/B/C/D]
+    C0 --> RAND[Randomizer<br/>Scale / Transpose / Silence]
+    C0 --> CLOCK[MIDI Clock<br/>24ppqn]
+    C0 --> LCD[LCD Renderer<br/>Program Info + Note Dots]
+
+    %% Core0 → Core1
+    C0 --> Q[MIDI Event Queue]
+
+    %% ============================
+    %% Core1（PRA32-U シンセ）
+    %% ============================
+    Q --> C1[Core1<br/>PRA32-U Synth]
+
+    C1 --> A[A Part<br/>Main]
+    C1 --> B[B Part<br/>Sub Bass]
+    C1 --> C[C Part<br/>Chord / Lead]
+    C1 --> D[D Part<br/>Japanese Arp]
+
+    %% ============================
+    %% オーディオ出力
+    %% ============================
+    C1 --> I2S[I2S Audio<br/>48kHz / 16bit]
+    I2S --> DAC[Pico-Audio DAC]
+    DAC --> OUT[Audio Out]
+
 ```
 
 ---
@@ -111,6 +128,54 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 ---
 
 ## 🔀 ランダマイザ
+
+```mermaid
+stateDiagram-v2
+    direction LR
+
+    %% ============================================================
+    %% ランダマイザは4つの独立した並列状態で構成される
+    %% ============================================================
+    state "KOSMOS2 Randomizer" as RANDOMIZER {
+        
+        %% -------------------------
+        %% 1. Scale Auto-Cycle
+        %% -------------------------
+        state "Scale Cycle" as SCALE {
+            [*] --> S0
+            S0 --> S1 : timer
+            S1 --> S2 : timer
+            S2 --> S0 : timer
+        }
+
+        %% -------------------------
+        %% 2. Auto Transpose
+        %% -------------------------
+        state "Transpose" as TRANS {
+            [*] --> T_IDLE
+            T_IDLE --> T_SHIFT : timer
+            T_SHIFT --> T_IDLE : apply transpose
+        }
+
+        %% -------------------------
+        %% 3. Auto Arpeggio Insert
+        %% -------------------------
+        state "Arpeggio" as ARP {
+            [*] --> A_IDLE
+            A_IDLE --> A_PLAY : timer
+            A_PLAY --> A_IDLE : phrase end
+        }
+
+        %% -------------------------
+        %% 4. Main Silence (A-part)
+        %% -------------------------
+        state "Main Silence" as SIL {
+            [*] --> M_ACTIVE
+            M_ACTIVE --> M_SILENT : timer
+            M_SILENT --> M_ACTIVE : regenerate pattern
+        }
+    }
+```
 
 ### ● 自動スケール切替  
 0 → 1 → 2 を一定周期で循環。
