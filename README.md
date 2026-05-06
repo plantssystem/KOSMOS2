@@ -21,7 +21,7 @@ KOSMOS2 は、
 **“自律生成” と “手動操作” を自然に融合させたライブ楽器**です。
 
 ---
-## 🎬 Demo Video
+## 🎬 Work-in-progress Demo Video
 
 [![KOSMOS2 Demo](https://img.youtube.com/vi/7rqsFbbVYpg/0.jpg)](https://youtube.com/shorts/7rqsFbbVYpg)
 
