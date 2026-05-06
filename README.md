@@ -215,7 +215,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ## KOSMOS2 CONTROLLER
 
-![KOSMOS2 Controller](docs/screenshots/KOSMOS2_Controller.jpg)
+![KOSMOS2 Controller](docs/screenshots/KOSMOS2_Controller_02.jpg)
 
 ---
 
