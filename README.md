@@ -24,7 +24,7 @@ KOSMOS2 は、
 **“自律生成” と “手動操作” を自然に融合させたライブ楽器**です。
 
 ---
-## 🎬 Demo Video
+## 🎬 デモ ビデオ
 
 [![KOSMOS2 Demo](https://img.youtube.com/vi/7rqsFbbVYpg/0.jpg)](https://youtube.com/shorts/7rqsFbbVYpg)
 
@@ -257,7 +257,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 - PRA32-U2 Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
-## KOSMOS2 CONTROLLER
+## KOSMOS2 コントローラー
 
 ![KOSMOS2 Controller](docs/screenshots/KOSMOS2_Controller_02.jpg)
 
