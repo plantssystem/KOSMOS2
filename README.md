@@ -264,6 +264,12 @@ MIT License
 
 ---
 
+## 👤 Author
+
+**Sugimoto**
+
+---
+
 ## Special Thanks
 - MATRIXSYNTH
 - Powerd by ISGK Instruments PRA32-U
