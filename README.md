@@ -1,14 +1,14 @@
+
+---
+
 # 🎛️ **KOSMOS2**  
 ### *ジェネレーティブ音響エンジン & パフォーマンスコントローラー*  
-> **ステータス：開発中**  
-> KOSMOS2 は現在開発中のプロジェクトです。  
-> Pico2 + PRA32-U2 の実装を進めており、今後の更新で仕様が変更される可能性があります。
 
 ---
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico と PRA32-U を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -24,6 +24,7 @@ KOSMOS2 は、
 **“自律生成” と “手動操作” を自然に融合させたライブ楽器**です。
 
 ---
+
 ## 🎬 デモ・ビデオ
 
 <p align="center">
@@ -36,39 +37,27 @@ KOSMOS2 は、
 </p>
 
 ---
-## 🗺️ 開発ロードマップ
 
-### Phase 1 — コアアーキテクチャ（完了）
-- [x] 4パートのジェネレーティブエンジン（A/B/C/D）の定義
-- [x] Core0 上でのパターンエンジン実装
-- [x] MIDI Clock（24ppqn）の実装
-- [x] TouchOSC → CC マッピング
-- [x] LCD UI（Program Info + Note Dots）の実装
-- [x] ランダマイザ（Scale / Transpose / Silence / Arp）の実装
+## ⚠️ Pico2（RP2350）についての重要な注意
 
----
+KOSMOS2 は **Raspberry Pi Pico（RP2040）** を前提として設計されています。
 
-### Phase 2 — ハードウェア移行（進行中）
-- [ ] PRA32-U → PRA32-U2/M（RP2350）への移植
-- [ ] Pico2 上での I2S オーディオ動作確認
-- [ ] Core1 上での 4パート同時発音の検証
-- [ ] CC100（プログラムチェンジ）の動作確認
-- [ ] 長時間動作テスト（5〜10分）
+後継機である **Pico2（RP2350）** は内部メモリ構造が大きく異なり、  
+Core1 が使用できる SRAM が約 48KB に制限されています。
 
----
+一方、KOSMOS2 が使用する **PRA32‑U2/M シンセエンジンは  
+1 インスタンスあたり約 20〜24KB の RAM を必要とします。**
 
-### Phase 3 — KOSMOS2 コントローラとの統合
-- [ ] Core1 のミュート／プログラム状態と LCD UI の同期
-- [ ] CC30/31/32（ランダム／リセット／ミュートランダム）の検証
-- [ ] NoteDots がリアルタイムのピッチ変化を正しく反映するか確認
-- [ ] Core0/Core1 間のキュー通信の最適化
+そのため：
 
----
+- A/B/C/D の **4 インスタンス構成は RP2350 のメモリに物理的に収まりません**
+- 実行すると **ノイズ・暴走・メモリ破壊・リンクエラー** が発生します
+- **RP2040 では問題なく 4 パート動作します**
 
-### Phase 4 — リリース準備
-- [ ] v1.0.0 のリリースノート作成
-- [ ] デモ動画の追加
-- [ ] README の最終調整（バッジ、図、アーキテクチャ）
+Pico2 でのメモリ制約の詳細は以下のドキュメントにまとめています：
+
+👉 **[Pico2（RP2350）で PRA32‑U2/M を 4 パート動かせない理由](docs/pico2-memory-limit.md)**
+```
 
 ---
 
@@ -85,7 +74,7 @@ flowchart TD
     %% ============================
     %% Core0（UI + ロジック）
     %% ============================
-    CC --> C0[Core0<br/>Pico2<br/>UI / Logic]
+    CC --> C0[Core0<br/>Pico<br/>UI / Logic]
 
     C0 --> PAT[Pattern Engine<br/>A/B/C/D]
     C0 --> RAND[Randomizer<br/>Scale / Transpose / Silence]
@@ -96,9 +85,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U2 シンセ）
+    %% Core1（PRA32-U シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U2 Synth]
+    Q --> C1[Core1<br/>PRA32-U Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -166,7 +155,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U2）
+## 🎼 4パート構成（PRA32-U）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -242,7 +231,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ---
 
-## 🎛 物理ボタン（Pico2）
+## 🎛 物理ボタン（Pico）
 
 | ボタン | 機能 |
 |--------|------|
@@ -258,10 +247,10 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ## 📦 ハードウェア構成
 
-- Raspberry Pi **Pico2**  
+- Raspberry Pi **Pico**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U2 Synth Engine（Core1）  
+- PRA32-U Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 コントローラー
@@ -278,7 +267,7 @@ MIT License
 
 ## Special Thanks
 - MATRIXSYNTH
-- Powerd by ISGK Instruments PRA32-U2
-- https://github.com/risgk/digital-synth-pra32-u2
+- Powerd by ISGK Instruments PRA32-U
+- https://github.com/risgk/digital-synth-PRA32-U
 
 ***
