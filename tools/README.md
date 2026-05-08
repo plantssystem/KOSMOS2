@@ -35,23 +35,6 @@
 
 ---
 
-## 🎥 デモ動画について
-
-以下の動画では、KOSMOS MIDI RANDOMIZER の動作を紹介しています：
-
-[`https://www.youtube.com/watch?v=RE0mhJEghZc`](https://www.youtube.com/watch?v=RE0mhJEghZc)
-
-内容：
-
-- KOSMOS2 からの MIDI 入力  
-- スケール切り替え  
-- ランダマイズの挙動  
-- 実際の音の変化と生成フレーズ  
-
-ジェネレーティブ音楽、アルゴリズミック作曲、日本音階に興味がある方に最適です。
-
----
-
 ## 🔗 推奨ユーザー
 
 - KOSMOS2 ユーザー  
