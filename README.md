@@ -36,7 +36,7 @@ KOSMOS2 は、
 ## 🎬 デモ・ビデオ
 
 <p align="center">
-  <a href="https://youtube.com/shorts/7rqsFbbVYpg">
+  <a href="https://youtube.com/shorts/SS_ioARNtFA">
     <img src="https://img.youtube.com/vi/SS_ioARNtFA/0.jpg" width="45%">
   </a>
   <a href="https://youtube.com/shorts/80GfBdG8Hes">
