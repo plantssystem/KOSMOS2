@@ -1,205 +1,204 @@
-/* KOSMOS + PRA32-U (All-in-One:  Waveshare Pico-Audio version) */
+// ----------------------- Core1: PRA32-U2/M KOSMOS2 4パート（ノイズなし版） -----------------------
 #include <Arduino.h>
-
-// Optional: give Core1 8KB stack if needed
-bool core1_separate_stack = false;
-
-// ----------------------- PRA32-U on Core1 (I2S + Waveshare Pico-Audio) ----------------------
 #include <I2S.h>
-
-#define PRA32_U_VERSION "v3.3.0 "
-#define PRA32_U_MIDI_CH (0)
-
-// I2S / DAC ピン定義（Waveshare Pico-Audio）
-#define PRA32_U_I2S_DAC_MUTE_OFF_PIN (22)
-
-// Waveshare Pico-Audio:
-// DIN  = GP26
-// BCK  = GP27
-// LRCK = GP28
-#define PRA32_U_I2S_DATA_PIN  (26)  // DIN
-#define PRA32_U_I2S_BCLK_PIN  (27)  // BCK
-#define PRA32_U_I2S_LRCLK_PIN (28)  // LRCK
-
-// PRA32-U のバッファ設定
-
-//#define PRA32_U_I2S_BUFFERS      (4)
-//#define PRA32_U_I2S_BUFFER_WORDS (32)
-#define PRA32_U_I2S_BUFFERS      (8)
-#define PRA32_U_I2S_BUFFER_WORDS (64)
-
-// 内部 MIDI ブリッジ（すでにあなたのコードにあるやつ）
-enum MidiEvType : uint8_t { EV_NOTE_ON=0, EV_NOTE_OFF=1, EV_CC=2 };
-struct MidiEvent { uint8_t type, d1, d2, ch; };
-namespace MidiQ {
-  constexpr size_t QSIZE=256; static volatile uint32_t head=0, tail=0; static MidiEvent q[QSIZE];
-  inline bool push(const MidiEvent& ev){uint32_t h=head,n=(h+1)%QSIZE; if(n==tail) return false; q[h]=ev; head=n; return true;}
-  inline bool pop(MidiEvent& out){uint32_t t=tail; if(t==head) return false; out=q[t]; tail=(t+1)%QSIZE; return true;}
-}
-
-inline void synth_note_on_core1(uint8_t note,uint8_t vel,uint8_t ch=0){
-    MidiEvent ev{EV_NOTE_ON,note,vel,ch};
-
-    // ★ 最大 100 回だけリトライ（数十マイクロ秒程度）
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) return;
-        tight_loop_contents();
-    }
-    // ここまで来たら諦めて捨てる（アルペジオの時間軸を優先）
-}
-
-inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
-    MidiEvent ev{EV_NOTE_OFF,note,0,ch};
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) return;
-        tight_loop_contents();
-    }
-}
-
-inline void midi_bridge_send_cc(uint8_t cc,uint8_t val,uint8_t ch=0){
-    MidiEvent ev{EV_CC,cc,val,ch};
-    for (int i = 0; i < 50; i++) {   // CC は優先度低めでリトライ回数も少なく
-        if (MidiQ::push(ev)) return;
-        tight_loop_contents();
-    }
-}
-
-// PRA32-U synth 用のグローバル
-uint8_t g_midi_ch = PRA32_U_MIDI_CH;
-#include "pra32-u-common.h"
-#include "pra32-u-synth.h"
-
-PRA32_U_Synth<true> g_synth;
-PRA32_U_Synth<true> g_sub_synth;
-PRA32_U_Synth<true> g_chord;
-PRA32_U_Synth<true> g_seq;
-
-// 標準 I2S インスタンス
-I2S i2s(OUTPUT);
-
 #include "pico/multicore.h"
+
+/* ---- I2S 出力 ---- */
+I2S g_i2s_output(OUTPUT);
+
+/* ---- PRA32-U2/M ---- */
+#define PRA32_U2_VERSION "v2.13.0"
+#define PRA32_U2_MIDI_CH (0)
+
+// Waveshare Pico-Audio
+#define PRA32_U2_I2S_DAC_MUTE_OFF_PIN (22)
+#define PRA32_U2_I2S_DATA_PIN  (26)
+#define PRA32_U2_I2S_BCLK_PIN  (27)
+
+#define PRA32_U2_I2S_BUFFERS      (4)
+#define PRA32_U2_I2S_BUFFER_WORDS (64)
+
+uint8_t g_midi_ch = PRA32_U2_MIDI_CH;
+
+#undef __not_in_flash_func
+#define __not_in_flash_func(x) x
+
+#include "pra32-u2-common.h"
+#include "pra32-u2-synth.h"
+
+struct PRA32_U2_Lite {
+    float phase = 0.0f;
+    float freq = 440.0f;
+    float env = 0.0f;
+    float envSpeed = 0.001f;
+    bool gate = false;
+
+    void initialize() {}
+
+    void program_change(int p) {}
+
+    void note_on(uint8_t note, uint8_t vel) {
+        freq = 440.0f * powf(2.0f, (note - 69) / 12.0f);
+        env = vel / 127.0f;
+        gate = true;
+    }
+
+    void note_off(uint8_t note) {
+        gate = false;
+    }
+
+    inline int16_t process(int32_t inL, int32_t inR,
+                           int16_t &outR,
+                           int32_t &l32, int32_t &r32)
+    {
+        if (gate) {
+            env += envSpeed;
+            if (env > 1.0f) env = 1.0f;
+        } else {
+            env -= envSpeed * 0.5f;
+            if (env < 0.0f) env = 0.0f;
+        }
+
+        phase += freq / 44100.0f;
+        if (phase >= 1.0f) phase -= 1.0f;
+
+        float s = sinf(phase * 2.0f * 3.14159265f);
+
+        int16_t v = (int16_t)(s * env * 3000.0f);
+
+        outR = v;
+        l32 = v;
+        r32 = v;
+
+        return v;
+    }
+};
+
+/* ---- Synth Instances ---- */
+// A: メイン
+PRA32_U2_Synth<false, false,  false, 0> g_synth;
+// B: サブ
+PRA32_U2_Synth<false, false,  false, 1> g_sub_synth;
+// C: コード
+PRA32_U2_Synth<false, false,  false, 2> g_chord;
+// D: シーケンス
+PRA32_U2_Synth<false, false,  false, 3> g_seq;
+
+/* ---- MIDI Bridge ---- */
+enum MidiEvType : uint8_t { EV_NOTE_ON=0, EV_NOTE_OFF=1, EV_CC=2 };
+
+inline void unpack_midi_ev(uint32_t v, MidiEvType &type, uint8_t &d1, uint8_t &d2, uint8_t &ch) {
+    type = MidiEvType(v & 0xFF);
+    d1   = (v >> 8)  & 0xFF;
+    d2   = (v >> 16) & 0xFF;
+    ch   = (v >> 24) & 0xFF;
+}
 
 float masterVolume = 1.0f;
 
-// ---- 音色番号----
-int programA = 0;     // ch1 初期音色
-int programB = 12;    // ch2 初期音色
-int programC = 6;     // ch3 初期音色
-int programD = 8;     // ch4 初期音色
+int programA = 0;
+int programB = 12;
+int programC = 6;
+int programD = 8;
 
-// ------------------------------------------------------
-// Core1: メイン処理（I2S + シンセ + MIDI受信）
-// ------------------------------------------------------
+/* ============================
+   Audio Render（A+B+C+D）
+   ============================ */
+void kosmos2_render(int16_t* L, int16_t* R, int N)
+{
+    // MIDI 受信
+    while (multicore_fifo_rvalid()) {
+        uint32_t v = multicore_fifo_pop_blocking();
+
+        MidiEvType type;
+        uint8_t d1, d2, ch;
+        unpack_midi_ev(v, type, d1, d2, ch);
+
+        if (type == EV_NOTE_ON) {
+            if (ch == 0) g_synth.note_on(d1, d2);
+            else if (ch == 1) g_sub_synth.note_on(d1, d2);
+            else if (ch == 2) g_chord.note_on(d1, d2);
+            else if (ch == 3) g_seq.note_on(d1, d2);
+        }
+        else if (type == EV_NOTE_OFF) {
+            if (ch == 0) g_synth.note_off(d1);
+            else if (ch == 1) g_sub_synth.note_off(d1);
+            else if (ch == 2) g_chord.note_off(d1);
+            else if (ch == 3) g_seq.note_off(d1);
+        }
+        else if (type == EV_CC) {
+            if (d1 == 7) masterVolume = (float)d2 / 127.0f;
+        }
+    }
+
+    // オーディオ生成
+    for (int i = 0; i < N; i++) {
+
+        int16_t subR, mainR, chordR, seqR;
+        int32_t subL32, subR32, mainL32, mainR32, chordL32, chordR32, seqL32, seqR32;
+
+        // B
+        g_sub_synth.process(0, 0, subR, subL32, subR32);
+
+        // A
+        int16_t mainL = g_synth.process(subL32, subR32, mainR, mainL32, mainR32);
+
+        // C
+        int16_t chordL = g_chord.process(0, 0, chordR, chordL32, chordR32);
+
+        // D
+        int16_t seqL = g_seq.process(0, 0, seqR, seqL32, seqR32);
+
+        // ミックス（4パート）
+        int32_t mixL = (mainL + chordL + (seqL >> 1)) >> 2;
+        int32_t mixR = (mainR + chordR + (seqR >> 1)) >> 2;
+
+        L[i] = (int16_t)(mixL * masterVolume);
+        R[i] = (int16_t)(mixR * masterVolume);
+    }
+}
+
+/* ============================
+   Core1 Main
+   ============================ */
 void __not_in_flash_func(core1_main)() {
 
-    pinMode(PRA32_U_I2S_DAC_MUTE_OFF_PIN, OUTPUT);
-    digitalWrite(PRA32_U_I2S_DAC_MUTE_OFF_PIN, HIGH);  // ミュート解除
+    while (multicore_fifo_rvalid()) multicore_fifo_pop_blocking();
 
-    g_synth.initialize();
-    g_synth.program_change(programA);
-    g_sub_synth.initialize();
-    g_sub_synth.program_change(programB);
-    g_chord.initialize();
-    g_chord.program_change(programC);
-    g_seq.initialize();
-    g_seq.program_change(programD);
+    pinMode(PRA32_U2_I2S_DAC_MUTE_OFF_PIN, OUTPUT);
+    digitalWrite(PRA32_U2_I2S_DAC_MUTE_OFF_PIN, HIGH);
 
-    i2s.setDATA(26);
-    i2s.setBCLK(27);
-    i2s.setBitsPerSample(16);
-    i2s.setFrequency(48000);
-    i2s.begin();
+    g_synth.initialize();      g_synth.program_change(programA);
+    g_sub_synth.initialize();  g_sub_synth.program_change(programB);
+    g_chord.initialize();      g_chord.program_change(programC);
+    g_seq.initialize();        g_seq.program_change(programD);
 
-    const int N = PRA32_U_I2S_BUFFER_WORDS;
-    int16_t Lbuf[N], Rbuf[N];
+    g_i2s_output.setSysClk(SAMPLING_RATE);
+    g_i2s_output.setFrequency(SAMPLING_RATE);
+    g_i2s_output.setDATA(PRA32_U2_I2S_DATA_PIN);
+    g_i2s_output.setBCLK(PRA32_U2_I2S_BCLK_PIN);
+    g_i2s_output.setBitsPerSample(16);
+    g_i2s_output.setBuffers(PRA32_U2_I2S_BUFFERS, PRA32_U2_I2S_BUFFER_WORDS);
+    g_i2s_output.begin();
+
+    constexpr int N = PRA32_U2_I2S_BUFFER_WORDS;
+    int16_t Lbuf[N];
+    int16_t Rbuf[N];
 
     while (true) {
-
-        // ★ MIDI 受信
-        MidiEvent ev;
-        while (MidiQ::pop(ev)) {
-            uint8_t ch = ev.ch;
-            if (ev.type == EV_NOTE_ON) {
-                if (ch == 0) g_synth.note_on(ev.d1, ev.d2);
-                else if (ch == 1) g_sub_synth.note_on(ev.d1, ev.d2);
-                else if (ch == 2) g_chord.note_on(ev.d1, ev.d2);
-                else if (ch == 3) g_seq.note_on(ev.d1, ev.d2);
-            }
-            else if (ev.type == EV_NOTE_OFF) {
-                if (ch == 0) g_synth.note_off(ev.d1);
-                else if (ch == 1) g_sub_synth.note_off(ev.d1);
-                else if (ch == 2) g_chord.note_off(ev.d1);
-                else if (ch == 3) g_seq.note_off(ev.d1);
-            }
-            else if (ev.type == EV_CC) {
-                if (ev.d1 == 100) {  // CC100 = 音色変更
-                    uint8_t prog = ev.d2;
-                    if (ch == 0) g_synth.program_change(prog);          // A
-                    else if (ch == 1) g_sub_synth.program_change(prog); // B
-                    else if (ch == 2) g_chord.program_change(prog);     // ★ C パート
-                    else if (ch == 3) g_seq.program_change(prog);       // ★ D パート
-                }
-                else if (ev.d1 == 7) {
-                    masterVolume = (float)ev.d2 / 127.0f;
-                }
-            }
-        }
-
-        // ★ I2S バッファ生成
+        kosmos2_render(Lbuf, Rbuf, N);
         for (int i = 0; i < N; i++) {
-
-            // ---- B パート ----
-            int16_t subR;
-            int16_t subL = g_sub_synth.process(0, subR);
-
-            // ---- A パート（A + B が合成される）----
-            int16_t mainR;
-            int16_t mainL = g_synth.process(subL, mainR);
-
-            // ---- C パート ----
-            int16_t chordR;
-            int16_t chordL_raw = g_chord.process(0, chordR);
-
-            // ★ C パートのゲイン調整（1.5〜2.0 が自然）
-            int16_t chordL = chordL_raw * 2;
-            int16_t chordR2 = chordR * 2;
-
-            // ---- D パート ----
-            int16_t seqR;
-            int16_t seqInput = (rand() & 3) - 1;
-            int16_t seqL = g_seq.process(seqInput, seqR);
-
-            // ---- C + D（D は 1/2 にして自然な存在感）----
-            int32_t sub2L = (int32_t)chordL + (seqL >> 1);
-            int32_t sub2R = (int32_t)chordR2 + (seqR >> 1);
-
-            // ---- A+B + (C+D) ----
-            int32_t sumL = (int32_t)mainL + sub2L;
-            int32_t sumR = (int32_t)mainR + sub2R;
-
-            // ---- /8 ミックス ----
-            int32_t mixL = sumL >> 3;
-            int32_t mixR = sumR >> 3;
-
-            // ---- クリップ ----
-            mixL = constrain(mixL, -32768, 32767);
-            mixR = constrain(mixR, -32768, 32767);
-
-            // ---- 最終ゲイン ----
-            Lbuf[i] = (int16_t)(mixL * 0.25f * masterVolume);
-            Rbuf[i] = (int16_t)(mixR * 0.25f * masterVolume);
-
-        }
-
-        // ★ I2S 出力
-        for (int i = 0; i < N; i++) {
-            i2s.write(Lbuf[i]);
-            i2s.write(Rbuf[i]);
+            g_i2s_output.write16(Lbuf[i], Rbuf[i]);
         }
     }
 }
 
 // ----------------------- Core0: KOSMOS2 (patched) -----------------------
+// ---- Core1 の MIDI ブリッジ関数（Core0 から見えるようにする）----
+void midi_bridge_send_note_on(uint8_t note, uint8_t vel, uint8_t ch);
+void midi_bridge_send_note_off(uint8_t note, uint8_t ch);
+void midi_bridge_send_cc(uint8_t cc, uint8_t val, uint8_t ch);
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <Adafruit_TinyUSB.h>
@@ -773,31 +772,6 @@ void usb_send_note_off(uint8_t note, uint8_t ch) {
     usb_midi.write(msg, 3);
 }
 
-inline void midi_bridge_send_note_on(uint8_t note, uint8_t vel, uint8_t ch=0){
-    MidiEvent ev{EV_NOTE_ON, note, vel, ch};
-
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) {
-            // ★ Core1 への送信が成功した瞬間に USB へも送る
-            usb_send_note_on(note, vel, ch);
-            return;
-        }
-        tight_loop_contents();
-    }
-}
-
-inline void midi_bridge_send_note_off(uint8_t note, uint8_t ch=0){
-    MidiEvent ev{EV_NOTE_OFF, note, 0, ch};
-
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) {
-            usb_send_note_off(note, ch);
-            return;
-        }
-        tight_loop_contents();
-    }
-}
-
 // ============================================================
 // ★ Yボタン（リズムパターン切替）
 // ============================================================
@@ -1340,6 +1314,25 @@ void updateStepDots() {
         lastStep = currentStep;
     }
 }
+
+inline void midi_bridge_send_note_on(uint8_t note, uint8_t vel, uint8_t ch) {
+    multicore_fifo_push_blocking(
+        (uint32_t(ch)<<24) | (uint32_t(vel)<<16) | (uint32_t(note)<<8) | 0
+    );
+}
+
+inline void midi_bridge_send_note_off(uint8_t note, uint8_t ch) {
+    multicore_fifo_push_blocking(
+        (uint32_t(ch)<<24) | (uint32_t(0)<<16) | (uint32_t(note)<<8) | 1
+    );
+}
+
+inline void midi_bridge_send_cc(uint8_t cc, uint8_t val, uint8_t ch) {
+    multicore_fifo_push_blocking(
+        (uint32_t(ch)<<24) | (uint32_t(val)<<16) | (uint32_t(cc)<<8) | 2
+    );
+}
+
 
 // 長押し判定用
 unsigned long holdStartHits = 0;
@@ -1990,7 +1983,13 @@ void playStartupArp() {
     }
 }
 
+uint32_t core1_stack[3072];
+
 void setup() {
+  // ★★★ Core1 を最初に起動する（最重要）★★★
+  multicore_launch_core1_with_stack(core1_main, core1_stack, sizeof(core1_stack));
+  delay(50);  // Core1 の初期化待ち
+
   Serial.begin(115200);
   delay(200);
   Serial.println("Core0: setup start");
@@ -2012,7 +2011,7 @@ void setup() {
 
   executeRandom();
   transpose += 5;
-  
+
   // ---- 起動時アルペジオ初期化（美しい低音スタート） ----
   int baseDegree = SCALE_HEI[0];   // 平調子の最も低い度数（D）
   int baseOct = 6;                 // C6
@@ -2038,9 +2037,6 @@ void setup() {
   drawAllStepBars();
 
   for (int i = 0; i < 240; i++) noteDots[i] = -1;
-
-  // ★★★ Core0 の初期化が全部終わってから Core1 を起動する ★★★
-  multicore_launch_core1(core1_main);
 
   lastX = (digitalRead(KEY_X_PIN) == LOW);
 
