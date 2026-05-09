@@ -1,4 +1,4 @@
-// ----------------------- Core1: PRA32-U2/M KOSMOS2 4パート（ノイズなし版） -----------------------
+// ----------------------- Core1: PRA32-U2/M KOSMOS2 4パート -----------------------
 #include <Arduino.h>
 #include <I2S.h>
 #include "pico/multicore.h"
