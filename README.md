@@ -151,6 +151,11 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
+## 🎛 LCDイメージ
+![Program Change](docs/gif/program_change.gif)
+
+---
+
 ## 🎼 4パート構成（PRA32-U）
 
 | パート | 役割 | 説明 |
