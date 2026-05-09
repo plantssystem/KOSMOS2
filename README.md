@@ -6,6 +6,14 @@
 
 ---
 
+![KOSMOS Screenshot](docs/screenshots/KOSMOS2.JPG)
+
+![Version](https://img.shields.io/badge/version-v1.0.0-blue)
+![Platform](https://img.shields.io/badge/platform-RP2040-orange)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
 ## 🚀 概要
 
 **KOSMOS2** は、Raspberry Pi Pico と PRA32-U を中心に構築された  
@@ -42,22 +50,10 @@ KOSMOS2 は、
 
 KOSMOS2 は **Raspberry Pi Pico（RP2040）** を前提として設計されています。
 
-後継機である **Pico2（RP2350）** は内部メモリ構造が大きく異なり、  
-Core1 が使用できる SRAM が約 48KB に制限されています。
-
-一方、KOSMOS2 が使用する **PRA32‑U2/M シンセエンジンは  
-1 インスタンスあたり約 20〜24KB の RAM を必要とします。**
-
-そのため：
-
-- A/B/C/D の **4 インスタンス構成は RP2350 のメモリに物理的に収まりません**
-- 実行すると **ノイズ・暴走・メモリ破壊・リンクエラー** が発生します
-- **RP2040 では問題なく 4 パート動作します**
-
+後継機である **Pico2（RP2350）** は内部メモリ構造が大きく異なり、Core1 が使用できる SRAM が約 48KB に制限されています。
 Pico2 でのメモリ制約の詳細は以下のドキュメントにまとめています：
 
 👉 **[Pico2（RP2350）で PRA32‑U2/M を 4 パート動かせない理由](docs/pico2-memory-limit.md)**
-```
 
 ---
 
@@ -262,6 +258,12 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 ## 📝 ライセンス
 
 MIT License
+
+---
+
+## 👤 Author
+
+**Sugimoto**
 
 ---
 
