@@ -35,9 +35,32 @@ KOSMOS2 は、
 
 ## 🎬 デモ・ビデオ
 
-<a href="https://www.youtube.com/playlist?list=PL_d4rx3iZh9w3rmW9Nm0cPF2PrU4V25_Q">
-  <img src="docs/screenshots/KOSMOS2_Playlist.png" width="480">
-</a>
+<table>
+  <tr>
+    <td>
+      <a href="https://youtube.com/shorts/80GfBdG8Hes?feature=share">
+        <img src="https://img.youtube.com/vi/80GfBdG8Hes/hqdefault.jpg" width="320">
+      </a>
+    </td>
+    <td>
+      <a href="https://youtube.com/shorts/SS_ioARNtFA?feature=share">
+        <img src="https://img.youtube.com/vi/SS_ioARNtFA/hqdefault.jpg" width="320">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <a href="https://youtube.com/shorts/dzc3_uC1vEQ?feature=share">
+        <img src="https://img.youtube.com/vi/dzc3_uC1vEQ/hqdefault.jpg" width="320">
+      </a>
+    </td>
+    <td>
+      <a href="https://youtube.com/shorts/FyKJ0lwDYQ4?feature=share">
+        <img src="https://img.youtube.com/vi/FyKJ0lwDYQ4/hqdefault.jpg" width="320">
+      </a>
+    </td>
+  </tr>
+</table>
 
 ---
 
