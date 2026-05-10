@@ -48,12 +48,11 @@ KOSMOS2 は、
 
 ## ⚠️ Pico2（RP2350）についての重要な注意
 
-KOSMOS2 は **Raspberry Pi Pico（RP2040）** を前提として設計されています。
+[![Status: Pico2 PRA32-U2/M Evaluation](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20testing-orange.svg)](#kosmos2)
 
-後継機である **Pico2（RP2350）** は内部メモリ構造が大きく異なり、Core1 が使用できる SRAM が約 48KB に制限されています。
-Pico2 でのメモリ制約の詳細は以下のドキュメントにまとめています：
-
-👉 **[Pico2（RP2350）で PRA32‑U2/M を 4 パート動かせない理由](docs/pico2-memory-limit.md)**
+現在、**Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 動作を検証中です。  
+I2S 出力・マルチコア DSP・内蔵シンセ（A/B/C/D 各パート）の安定動作を順次確認しながら、  
+Pico2 向け最適化版として整備していきます。
 
 ---
 
