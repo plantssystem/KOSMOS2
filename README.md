@@ -291,6 +291,7 @@ MIT License
 
 ## Special Thanks
 - MATRIXSYNTH
-- Powerd by ISGK Instruments PRA32-U
+- Powerd by ISGK Instruments PRA32-U2
+- https://github.com/risgk/digital-synth-pra32-u2
 
 ***
