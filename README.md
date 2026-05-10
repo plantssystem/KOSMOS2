@@ -64,7 +64,7 @@ KOSMOS2 は、
 
 ---
 
-## ⚠️ Pico2（RP2350）についての重要な注意
+## ⚠️ Pico2（RP2350）動作検証について
 
 [![Status: Pico2 PRA32-U2/M Evaluation](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20testing-orange.svg)](#kosmos2)
 
