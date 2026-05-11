@@ -64,7 +64,7 @@ KOSMOS2 は、
 
 ---
 
-## ⚠️ Pico2（RP2350）動作検証について
+## ⚠️ Pico2（RP2350）について
 [![Status: Pico2 PRA32-U2/M Verified](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20verified-brightgreen.svg)](#kosmos2)
 
 **Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 v2.0.0リリースしました。  
