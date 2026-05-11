@@ -65,12 +65,11 @@ KOSMOS2 は、
 ---
 
 ## ⚠️ Pico2（RP2350）動作検証について
+[![Status: Pico2 PRA32-U2/M Verified](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20verified-brightgreen.svg)](#kosmos2)
 
-[![Status: Pico2 PRA32-U2/M Evaluation](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20testing-orange.svg)](#kosmos2)
-
-現在、**Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 動作を検証中です。  
-I2S 出力・マルチコア DSP・内蔵シンセ（A/B/C/D 各パート）の安定動作を順次確認しながら、  
-Pico2 向け最適化版として整備していきます。
+**Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 v2.0.0リリースしました。  
+I2S 出力・マルチコア DSP・内蔵シンセ（A/B/C/D 各パート）の安定動作を確認。  
+Pico2 向け最適化版。
 
 ---
 
