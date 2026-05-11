@@ -1,15 +1,16 @@
 #pragma once
 
-#include "pra32-u-common.h"
-#include "pra32-u-osc.h"
-#include "pra32-u-filter.h"
-#include "pra32-u-amp.h"
-#include "pra32-u-lfo.h"
-#include "pra32-u-noise-gen.h"
-#include "pra32-u-eg.h"
-#include "pra32-u-chorus-fx.h"
-#include "pra32-u-delay-fx.h"
-#include "pra32-u-program-table.h"
+#include "pra32-u2-common.h"
+#include "pra32-u2-osc.h"
+#include "pra32-u2-filter.h"
+#include "pra32-u2-amp.h"
+#include "pra32-u2-panner.h"
+#include "pra32-u2-lfo.h"
+#include "pra32-u2-noise-gen.h"
+#include "pra32-u2-eg.h"
+#include "pra32-u2-chorus-fx.h"
+#include "pra32-u2-delay-fx.h"
+#include "pra32-u2-program-table.h"
 
 #if defined(ARDUINO_ARCH_RP2040)
 #include <EEPROM.h>
@@ -21,6 +22,10 @@ extern I2S g_i2s_output;
 #include <cstring>
 #include <variant>
 #include <type_traits>
+
+#if !defined(PRA32_U2_NUMBER_OF_SYNTHS)
+#define PRA32_U2_NUMBER_OF_SYNTHS              (1)
+#endif
 
 static uint8_t s_program_table_parameters[] = {
   OSC_1_WAVE     ,
@@ -73,8 +78,13 @@ static uint8_t s_program_table_parameters[] = {
   EG_VEL_SENS    ,
   AMP_VEL_SENS   ,
 
+  AFT_T_LFO_AMT  ,
   VOICE_ASGN_MODE,
+  PAN            ,
 
+
+  OSC_DRIFT      ,
+  OSC_SAW_W_MODE ,
 
 
 
@@ -83,10 +93,10 @@ static uint8_t s_program_table_parameters[] = {
   CHORUS_DEPTH   ,
 
 
-  DELAY_FEEDBACK ,
+  DELAY_LEVEL    ,
   DELAY_TIME     ,
+  DELAY_FEEDBACK ,
   DELAY_MODE     ,
-
 };
 
 static uint8_t s_program_table_panel_parameters[] = {
@@ -127,11 +137,11 @@ static uint8_t s_program_table_panel_parameters[] = {
 
   SEQ_MODE       ,
   SEQ_ACT_STEPS  ,
-  SEQ_TRANSPOSE  ,
+  SEQ_PIT_OFST   ,
   SEQ_STEP_NOTE  ,
 
   SEQ_ON_STEPS   ,
-
+  SEQ_TRX_ST_SP  ,
 
 
 };
@@ -141,8 +151,8 @@ const uint8_t   DEFAULT_PANEL_SCALE     = 0  ;
 const uint8_t   DEFAULT_PANEL_TRANSPOSE = 64 ;
 const uint8_t   DEFAULT_PANEL_PLAY_MODE = 0  ;
 
-const uint8_t   DEFAULT_PANEL_PLAY_PIT  = 64 ;
-const uint8_t   DEFAULT_PANEL_PLAY_VELO = 64 ;
+const uint8_t   DEFAULT_PANEL_PLAY_PIT  = 0  ;
+const uint8_t   DEFAULT_PANEL_PLAY_VELO = 100;
 const uint8_t   DEFAULT_PANEL_PIT_OFST  = 64 ;
 
 
@@ -152,43 +162,55 @@ const uint8_t   DEFAULT_SEQ_PITCH_2     = 97 ;
 const uint8_t   DEFAULT_SEQ_PITCH_3     = 117;
 
 const uint8_t   DEFAULT_SEQ_PITCH_4     = 72 ;
-const uint8_t   DEFAULT_SEQ_PITCH_5     = 91 ;
+const uint8_t   DEFAULT_SEQ_PITCH_5     = 89 ;
 const uint8_t   DEFAULT_SEQ_PITCH_6     = 107;
-const uint8_t   DEFAULT_SEQ_PITCH_7     = 122;
+const uint8_t   DEFAULT_SEQ_PITCH_7     = 124;
 
-const uint8_t   DEFAULT_SEQ_VELO_0      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_1      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_2      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_3      = 64 ;
+const uint8_t   DEFAULT_SEQ_VELO_0      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_1      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_2      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_3      = 100;
 
-const uint8_t   DEFAULT_SEQ_VELO_4      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_5      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_6      = 64 ;
-const uint8_t   DEFAULT_SEQ_VELO_7      = 64 ;
+const uint8_t   DEFAULT_SEQ_VELO_4      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_5      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_6      = 100;
+const uint8_t   DEFAULT_SEQ_VELO_7      = 100;
 
-const uint8_t   DEFAULT_SEQ_TEMPO       = 64 ;
+const uint8_t   DEFAULT_SEQ_TEMPO       = 32 ;
 const uint8_t   DEFAULT_SEQ_CLOCK_SRC   = 0  ;
 const uint8_t   DEFAULT_SEQ_GATE_TIME   = 60 ;
 const uint8_t   DEFAULT_SEQ_NUM_STEPS   = 32 ;
 
 const uint8_t   DEFAULT_SEQ_MODE        = 0  ;
 const uint8_t   DEFAULT_SEQ_ACT_STEPS   = 127;
-const uint8_t   DEFAULT_SEQ_TRANSPOSE   = 64 ;
+const uint8_t   DEFAULT_SEQ_PIT_OFST    = 64 ;
 const uint8_t   DEFAULT_SEQ_STEP_NOTE   = 64 ;
 
 const uint8_t   DEFAULT_SEQ_ON_STEPS    = 127;
+const uint8_t   DEFAULT_SEQ_TRX_ST_SP   = 0  ;
 
-template <boolean BYPASS_FX = false>
-class PRA32_U_Synth {
-  PRA32_U_Osc       m_osc;
-  PRA32_U_Filter    m_filter[4];
-  PRA32_U_Amp       m_amp[4];
-  PRA32_U_NoiseGen  m_noise_gen;
-  PRA32_U_LFO       m_lfo;
-  PRA32_U_EG        m_eg[2 * 4];
 
-  using ChorusFx = std::conditional_t<BYPASS_FX, std::monostate, PRA32_U_ChorusFx>;
-  using DelayFx  = std::conditional_t<BYPASS_FX, std::monostate, PRA32_U_DelayFx>;
+
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
+extern void PRA32_U2_ControlPanel_on_control_change(uint8_t control_number);
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
+
+
+static int32_t s_placeholder_int32;
+
+template <boolean NO_FX = false, boolean EXT_INPUT = false, boolean EXT_OUTPUT = false, uint32_t SYNTH_ID = 0, boolean MONO_LEVEL_DOWN = false, boolean RESTRICT_POLY = false>
+class PRA32_U2_Synth {
+  PRA32_U2_Osc      m_osc;
+  PRA32_U2_Filter   m_filter[4];
+  PRA32_U2_Amp      m_amp[4];
+  PRA32_U2_Panner   m_panner;
+  PRA32_U2_NoiseGen m_noise_gen;
+  PRA32_U2_LFO      m_lfo;
+  PRA32_U2_EG       m_eg[2 * 4];
+
+  using ChorusFx = std::conditional_t<NO_FX, std::monostate, PRA32_U2_ChorusFx>;
+  using DelayFx  = std::conditional_t<NO_FX, std::monostate, PRA32_U2_DelayFx>;
   ChorusFx          m_chorus_fx;
   DelayFx           m_delay_fx;
 
@@ -196,8 +218,8 @@ class PRA32_U_Synth {
 
   uint8_t           m_note_queue[4];
   uint8_t           m_note_on_number[4];
-  uint8_t           m_note_on_count[128];
-  uint8_t           m_note_on_total_count;
+  uint32_t          m_note_on_count[128];
+  uint32_t          m_note_on_total_count;
   uint8_t           m_last_note_on_index;
   boolean           m_sustain_pedal;
   uint8_t           m_voice_mode;
@@ -236,18 +258,19 @@ class PRA32_U_Synth {
   volatile int32_t  m_secondary_core_processing_result;
 
 public:
-  PRA32_U_Synth()
+  PRA32_U2_Synth()
 
   : m_osc()
   , m_filter()
   , m_amp()
-  , m_noise_gen()
+  , m_panner()
+  , m_noise_gen(SYNTH_ID)
   , m_lfo()
   , m_eg()
   , m_chorus_fx()
   , m_delay_fx()
 
-  , m_count()
+  , m_count(0xFFFFFFFFu + SYNTH_ID)
 
   , m_note_queue()
   , m_note_on_number()
@@ -279,7 +302,7 @@ public:
   , m_controller_value_eg_amp_mod(0)
   , m_controller_value_rel_eq_decay(0)
 
-  , m_program_number_to_write(0)
+  , m_program_number_to_write(8)
   , m_wr_prog_to_flash_cc_value(0)
   , m_sp_prog_chg_cc_values()
   , m_current_controller_value_table()
@@ -299,27 +322,29 @@ public:
     m_note_on_number[2] = NOTE_NUMBER_INVALID;
     m_note_on_number[3] = NOTE_NUMBER_INVALID;
 
-    set_voice_mode(VOICE_PARAPHONIC);
+    set_voice_mode(VOICE_MONOPHONIC);
 
     m_amp[0].set_gain(127);
     m_amp[1].set_gain(127);
     m_amp[2].set_gain(127);
     m_amp[3].set_gain(127);
 
+    m_panner.set_pan(64);
+
     m_eg_osc_amt = 64;
     m_lfo_osc_amt = 64;
   }
 
-  INLINE void initialize() {
+  /* INLINE */ void __not_in_flash_func(initialize)() {
     std::memcpy(m_program_table[OSC_1_WAVE     ], g_preset_table_OSC_1_WAVE     , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[MIXER_SUB_OSC  ], g_preset_table_MIXER_SUB_OSC  , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[OSC_1_SHAPE    ], g_preset_table_OSC_1_SHAPE    , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[OSC_1_MORPH    ], g_preset_table_OSC_1_MORPH    , sizeof(m_program_table[0]));
-    std::memcpy(m_program_table[MIXER_SUB_OSC  ], g_preset_table_MIXER_SUB_OSC  , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[OSC_2_WAVE     ], g_preset_table_OSC_2_WAVE     , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[MIXER_OSC_MIX  ], g_preset_table_MIXER_OSC_MIX  , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[OSC_2_COARSE   ], g_preset_table_OSC_2_COARSE   , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[OSC_2_PITCH    ], g_preset_table_OSC_2_PITCH    , sizeof(m_program_table[0]));
-    std::memcpy(m_program_table[MIXER_OSC_MIX  ], g_preset_table_MIXER_OSC_MIX  , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[FILTER_CUTOFF  ], g_preset_table_FILTER_CUTOFF  , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[FILTER_RESO    ], g_preset_table_FILTER_RESO    , sizeof(m_program_table[0]));
@@ -337,9 +362,9 @@ public:
     std::memcpy(m_program_table[PORTAMENTO     ], g_preset_table_PORTAMENTO     , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[LFO_WAVE       ], g_preset_table_LFO_WAVE       , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[LFO_FADE_TIME  ], g_preset_table_LFO_FADE_TIME  , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[LFO_RATE       ], g_preset_table_LFO_RATE       , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[LFO_DEPTH      ], g_preset_table_LFO_DEPTH      , sizeof(m_program_table[0]));
-    std::memcpy(m_program_table[LFO_FADE_TIME  ], g_preset_table_LFO_FADE_TIME  , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[LFO_OSC_AMT    ], g_preset_table_LFO_OSC_AMT    , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[LFO_OSC_DST    ], g_preset_table_LFO_OSC_DST    , sizeof(m_program_table[0]));
@@ -352,28 +377,34 @@ public:
     std::memcpy(m_program_table[AMP_RELEASE    ], g_preset_table_AMP_RELEASE    , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[FILTER_MODE    ], g_preset_table_FILTER_MODE    , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[P_BEND_RANGE   ], g_preset_table_P_BEND_RANGE   , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[EG_AMP_MOD     ], g_preset_table_EG_AMP_MOD     , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[REL_EQ_DECAY   ], g_preset_table_REL_EQ_DECAY   , sizeof(m_program_table[0]));
-    std::memcpy(m_program_table[P_BEND_RANGE   ], g_preset_table_P_BEND_RANGE   , sizeof(m_program_table[0]));
 
     std::memcpy(m_program_table[BTH_FILTER_AMT ], g_preset_table_BTH_FILTER_AMT , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[BTH_AMP_MOD    ], g_preset_table_BTH_AMP_MOD    , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[EG_VEL_SENS    ], g_preset_table_EG_VEL_SENS    , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[AMP_VEL_SENS   ], g_preset_table_AMP_VEL_SENS   , sizeof(m_program_table[0]));
 
+    std::memcpy(m_program_table[AFT_T_LFO_AMT  ], g_preset_table_AFT_T_LFO_AMT  , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[VOICE_ASGN_MODE], g_preset_table_VOICE_ASGN_MODE, sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[PAN            ], g_preset_table_PAN            , sizeof(m_program_table[0]));
 
+
+    std::memcpy(m_program_table[OSC_DRIFT      ], g_preset_table_OSC_DRIFT      , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[OSC_SAW_W_MODE ], g_preset_table_OSC_SAW_W_MODE , sizeof(m_program_table[0]));
 
 
 
     std::memcpy(m_program_table[CHORUS_MIX     ], g_preset_table_CHORUS_MIX     , sizeof(m_program_table[0]));
+
     std::memcpy(m_program_table[CHORUS_RATE    ], g_preset_table_CHORUS_RATE    , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[CHORUS_DEPTH   ], g_preset_table_CHORUS_DEPTH   , sizeof(m_program_table[0]));
 
-
+    std::memcpy(m_program_table[DELAY_LEVEL    ], g_preset_table_DELAY_LEVEL   , sizeof(m_program_table[0]));
+    std::memcpy(m_program_table[DELAY_MODE     ], g_preset_table_DELAY_MODE     , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[DELAY_FEEDBACK ], g_preset_table_DELAY_FEEDBACK , sizeof(m_program_table[0]));
     std::memcpy(m_program_table[DELAY_TIME     ], g_preset_table_DELAY_TIME     , sizeof(m_program_table[0]));
-    std::memcpy(m_program_table[DELAY_MODE     ], g_preset_table_DELAY_MODE     , sizeof(m_program_table[0]));
 
     for (uint32_t i = 0; i < sizeof(m_program_table_panel) / sizeof(m_program_table_panel[0]); ++i) {
       m_program_table_panel[i][PANEL_SCALE    ] = DEFAULT_PANEL_SCALE    ;
@@ -413,25 +444,25 @@ public:
 
       m_program_table_panel[i][SEQ_MODE       ] = DEFAULT_SEQ_MODE       ;
       m_program_table_panel[i][SEQ_ACT_STEPS  ] = DEFAULT_SEQ_ACT_STEPS  ;
-      m_program_table_panel[i][SEQ_TRANSPOSE  ] = DEFAULT_SEQ_TRANSPOSE  ;
+      m_program_table_panel[i][SEQ_PIT_OFST   ] = DEFAULT_SEQ_PIT_OFST   ;
       m_program_table_panel[i][SEQ_STEP_NOTE  ] = DEFAULT_SEQ_STEP_NOTE  ;
 
       m_program_table_panel[i][SEQ_ON_STEPS   ] = DEFAULT_SEQ_ON_STEPS   ;
-
+      m_program_table_panel[i][SEQ_TRX_ST_SP  ] = DEFAULT_SEQ_TRX_ST_SP  ;
 
 
     }
 
 #if defined(ARDUINO_ARCH_RP2040)
-#if defined(PRA32_U_USE_EMULATED_EEPROM)
+#if defined(PRA32_U2_USE_EMULATED_EEPROM)
     EEPROM.begin(2048);
 
-#if !defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
-    for (uint32_t program_number = (PRESET_PROGRAM_NUMBER_MAX + 1); program_number <= PROGRAM_NUMBER_MAX; ++program_number) {
-      if ((EEPROM.read(program_number * 128) == 'U') && (EEPROM.read(program_number * 128 + 1) == program_number)) {
+#if !defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+    for (uint32_t program_number = 0; program_number <= USER_PROGRAM_NUMBER_MAX; ++program_number) {
+      if ((EEPROM.read(1024 + program_number * 128) == 'U') && (EEPROM.read(1024 + program_number * 128 + 1) == program_number)) {
         for (uint32_t i = 0; i < sizeof(s_program_table_parameters) / sizeof(s_program_table_parameters[0]); ++i) {
           uint32_t control_number = s_program_table_parameters[i];
-          uint8_t value_read = EEPROM.read(program_number * 128 + control_number);
+          uint8_t value_read = EEPROM.read(1024 + program_number * 128 + control_number);
           if (value_read < 128) {
             m_program_table[control_number][program_number] = value_read;
           }
@@ -439,7 +470,7 @@ public:
       }
     }
 
-#if defined(PRA32_U_USE_CONTROL_PANEL)
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
     if ((EEPROM.read(0) == 'P') && (EEPROM.read(1) == 0)) {
       for (uint32_t i = 0; i < sizeof(s_program_table_panel_parameters) / sizeof(s_program_table_panel_parameters[0]); ++i) {
         uint32_t control_number = s_program_table_panel_parameters[i];
@@ -449,27 +480,29 @@ public:
         }
       }
     }
-#endif  // defined(PRA32_U_USE_CONTROL_PANEL)
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 
-#endif  // !defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
-#endif  // defined(PRA32_U_USE_EMULATED_EEPROM)
+#endif  // !defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+#endif  // defined(PRA32_U2_USE_EMULATED_EEPROM)
 #endif  // defined(ARDUINO_ARCH_RP2040)
 
-    program_change(PROGRAM_NUMBER_DEFAULT);
+    program_change((PROGRAM_NUMBER_DEFAULT + ((PRA32_U2_NUMBER_OF_SYNTHS > 1) * 4) + SYNTH_ID) & USER_PROGRAM_NUMBER_MAX);
 
-#if defined(PRA32_U_USE_CONTROL_PANEL)
+    reset_all_controllers();
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
     for (uint32_t i = 0; i < sizeof(s_program_table_panel_parameters) / sizeof(s_program_table_panel_parameters[0]); ++i) {
       uint32_t control_number = s_program_table_panel_parameters[i];
       control_change(control_number, m_program_table_panel[0][control_number]);
     }
-#endif  // defined(PRA32_U_USE_CONTROL_PANEL)
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
   }
 
   INLINE uint8_t current_controller_value(uint8_t control_number) {
     return m_current_controller_value_table[control_number];
   }
 
-  /* INLINE */ void note_on(uint8_t note_number, uint8_t velocity) {
+  /* INLINE */ void __not_in_flash_func(note_on)(uint8_t note_number, uint8_t velocity) {
     if (velocity == 0) {
       note_off(note_number);
       return;
@@ -490,13 +523,10 @@ public:
 
           if (m_voice_mode == VOICE_LEGATO_PORTA) {
             m_osc.set_portamento<0>(0);
-            m_osc.set_portamento<2>(0);
           } else {
             m_osc.set_portamento<0>(m_portamento);
-            m_osc.set_portamento<2>(m_portamento);
           }
           m_osc.note_on<0>(note_number);
-          m_osc.note_on<2>(note_number);
           m_lfo.trigger_lfo();
           m_eg[0].note_on(velocity);
           m_eg[1].note_on(velocity);
@@ -507,9 +537,7 @@ public:
           m_note_on_number[0] = note_number;
 
           m_osc.set_portamento<0>(m_portamento);
-          m_osc.set_portamento<2>(m_portamento);
           m_osc.note_on<0>(note_number);
-          m_osc.note_on<2>(note_number);
         }
       } else {
         ++m_note_on_total_count;
@@ -521,9 +549,7 @@ public:
         m_note_on_number[0] = note_number;
 
         m_osc.set_portamento<0>(m_portamento);
-        m_osc.set_portamento<2>(m_portamento);
         m_osc.note_on<0>(note_number);
-        m_osc.note_on<2>(note_number);
         m_lfo.trigger_lfo();
         m_eg[0].note_on(velocity);
         m_eg[1].note_on(velocity);
@@ -700,7 +726,7 @@ public:
     }
   }
 
-  /* INLINE */ void note_off(uint8_t note_number) {
+  /* INLINE */ void __not_in_flash_func(note_off)(uint8_t note_number) {
     if (m_note_on_total_count == 0) {
       return;
     }
@@ -739,9 +765,7 @@ public:
 
         if (m_note_on_number[0] != NOTE_NUMBER_INVALID) {
           m_osc.set_portamento<0>(m_portamento);
-          m_osc.set_portamento<2>(m_portamento);
           m_osc.note_on<0>(m_note_on_number[0]);
-          m_osc.note_on<2>(m_note_on_number[0]);
 
           if (m_voice_mode == VOICE_MONOPHONIC) {
             m_lfo.trigger_lfo();
@@ -819,7 +843,7 @@ public:
     m_note_on_number[1] = NOTE_NUMBER_INVALID;
     m_note_on_number[2] = NOTE_NUMBER_INVALID;
     m_note_on_number[3] = NOTE_NUMBER_INVALID;
-    for (uint8_t i = 0; i < sizeof(m_note_on_count); ++i) {
+    for (uint8_t i = 0; i < (sizeof(m_note_on_count) / sizeof(m_note_on_count[0])); ++i) {
       m_note_on_count[i] = 0;
     }
     m_note_on_total_count = 0;
@@ -849,16 +873,18 @@ public:
   INLINE void reset_all_controllers() {
     pitch_bend(0, 64);
     control_change(MODULATION      , 0  );
+    control_change(EXPRESSION      , 127);
     control_change(BTH_CONTROLLER  , 0  );
     control_change(SUSTAIN_PEDAL   , 0  );
+    after_touch_channel(0);
   }
 
-  /* INLINE */ void control_change(uint8_t control_number, uint8_t controller_value) {
+  /* INLINE */ void __not_in_flash_func(control_change)(uint8_t control_number, uint8_t controller_value) {
     m_current_controller_value_table[control_number] = controller_value;
 
-#if defined(PRA32_U_USE_CONTROL_PANEL)
-    PRA32_U_ControlPanel_on_control_change(control_number);
-#endif  // defined(PRA32_U_USE_CONTROL_PANEL)
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
+    PRA32_U2_ControlPanel_on_control_change(control_number);
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 
     switch (control_number) {
     case MODULATION     :
@@ -878,10 +904,10 @@ public:
       m_filter[3].set_resonance(controller_value);
       break;
     case FILTER_EG_AMT  :
-      m_filter[0].set_cutoff_eg_amt(controller_value);
-      m_filter[1].set_cutoff_eg_amt(controller_value);
-      m_filter[2].set_cutoff_eg_amt(controller_value);
-      m_filter[3].set_cutoff_eg_amt(controller_value);
+      m_filter[0].set_cutoff_eg_amt(0, controller_value);
+      m_filter[1].set_cutoff_eg_amt(0, controller_value);
+      m_filter[2].set_cutoff_eg_amt(0, controller_value);
+      m_filter[3].set_cutoff_eg_amt(0, controller_value);
       break;
 
     case OSC_1_WAVE     :
@@ -901,7 +927,7 @@ public:
       break;
 
     case LFO_RATE       :
-      m_lfo.set_lfo_rate(controller_value);
+      m_lfo.set_lfo_rate<SYNTH_ID>(controller_value);
       break;
     case LFO_DEPTH      :
       m_lfo.set_lfo_depth<0>(controller_value);
@@ -911,10 +937,10 @@ public:
       update_lfo_osc_mod();
       break;
     case LFO_FILTER_AMT :
-      m_filter[0].set_cutoff_lfo_amt(controller_value);
-      m_filter[1].set_cutoff_lfo_amt(controller_value);
-      m_filter[2].set_cutoff_lfo_amt(controller_value);
-      m_filter[3].set_cutoff_lfo_amt(controller_value);
+      m_filter[0].set_cutoff_lfo_amt(0, controller_value);
+      m_filter[1].set_cutoff_lfo_amt(0, controller_value);
+      m_filter[2].set_cutoff_lfo_amt(0, controller_value);
+      m_filter[3].set_cutoff_lfo_amt(0, controller_value);
       break;
 
     case SUSTAIN_PEDAL   :
@@ -956,18 +982,18 @@ public:
       break;
 
     case CHORUS_DEPTH   :
-if constexpr (BYPASS_FX == false) {
+if constexpr (NO_FX == false) {
       m_chorus_fx.set_chorus_depth(controller_value);
 }
       break;
     case CHORUS_RATE    :
-if constexpr (BYPASS_FX == false) {
+if constexpr (NO_FX == false) {
       m_chorus_fx.set_chorus_rate(controller_value);
 }
       break;
     case CHORUS_MIX     :
-if constexpr (BYPASS_FX == false) {
-      m_chorus_fx.set_chorus_mix(controller_value);
+if constexpr (NO_FX == false) {
+      m_chorus_fx.set_chorus_level(controller_value);
 }
       break;
 
@@ -1054,23 +1080,41 @@ if constexpr (BYPASS_FX == false) {
 
     case VOICE_ASGN_MODE:
       m_voice_asgn_mode = (controller_value < 64) ? 1 : 2;
-      if (controller_value == 1) {
-        m_voice_asgn_mode = 2;
-      }
       break;
 
-    case DELAY_FEEDBACK :
-if constexpr (BYPASS_FX == false) {
-      m_delay_fx.set_delay_feedback(controller_value);
+    case PAN            :
+      m_panner.set_pan(controller_value);
+      break;
+
+    case OSC_DRIFT      :
+      m_osc.set_drift(controller_value);
+      break;
+
+    case OSC_SAW_W_MODE :
+      m_osc.set_saw_wave_mode(controller_value);
+      break;
+
+    case AFT_T_LFO_AMT  :
+      m_lfo.set_pressure_amt(controller_value);
+      break;
+
+    case DELAY_LEVEL    :
+if constexpr (NO_FX == false) {
+      m_delay_fx.set_delay_level(controller_value);
 }
       break;
     case DELAY_TIME     :
-if constexpr (BYPASS_FX == false) {
+if constexpr (NO_FX == false) {
       m_delay_fx.set_delay_time(controller_value);
 }
       break;
+    case DELAY_FEEDBACK :
+if constexpr (NO_FX == false) {
+      m_delay_fx.set_delay_feedback(controller_value);
+}
+      break;
     case DELAY_MODE     :
-if constexpr (BYPASS_FX == false) {
+if constexpr (NO_FX == false) {
       m_delay_fx.set_delay_mode(controller_value);
 }
       break;
@@ -1100,7 +1144,14 @@ if constexpr (BYPASS_FX == false) {
       m_eg[7].set_velocity_sensitivity(controller_value);
       break;
 
-    case BTH_CONTROLLER    :
+    case EXPRESSION     :
+      m_amp[0].set_expression(controller_value);
+      m_amp[1].set_expression(controller_value);
+      m_amp[2].set_expression(controller_value);
+      m_amp[3].set_expression(controller_value);
+      break;
+
+    case BTH_CONTROLLER :
       set_breath_controller(controller_value);
       break;
 
@@ -1136,32 +1187,57 @@ if constexpr (BYPASS_FX == false) {
       break;
 
     // Program Change by CC
-    case PC_BY_CC_8     :
-    case PC_BY_CC_9     :
-    case PC_BY_CC_10    :
-    case PC_BY_CC_11    :
-    case PC_BY_CC_12    :
-    case PC_BY_CC_13    :
-    case PC_BY_CC_14    :
-    case PC_BY_CC_15    :
+    case PC_BY_CC_0     :
+    case PC_BY_CC_1     :
+    case PC_BY_CC_2     :
+    case PC_BY_CC_3     :
+    case PC_BY_CC_4     :
+    case PC_BY_CC_5     :
+    case PC_BY_CC_6     :
+    case PC_BY_CC_7     :
       {
-        uint8_t program_index = control_number - PC_BY_CC_8;
+        uint8_t program_index = control_number - PC_BY_CC_0;
         uint8_t old_value = m_sp_prog_chg_cc_values[program_index];
         m_sp_prog_chg_cc_values[program_index] = controller_value;
         if ((old_value < 64) && (controller_value >= 64)) {
-          program_change(program_index + 8);
+          program_change(program_index);
         }
       }
       break;
     }
   }
 
-  /* INLINE */ void pitch_bend(uint8_t lsb, uint8_t msb) {
+  /* INLINE */ void __not_in_flash_func(pitch_bend)(uint8_t lsb, uint8_t msb) {
     int16_t pitch_bend = ((static_cast<uint16_t>(msb) << 8) >> 1) + lsb - 8192;
     m_osc.set_pitch_bend(pitch_bend);
   }
 
-  /* INLINE */ void program_change(uint8_t program_number) {
+  /* INLINE */ void __not_in_flash_func(after_touch_poly)(uint8_t note_number, uint8_t pressure) {
+    if (m_note_on_number[0] == note_number) {
+      m_lfo.set_pressure<0>(pressure);
+    }
+
+    if (m_note_on_number[1] == note_number) {
+      m_lfo.set_pressure<1>(pressure);
+    }
+
+    if (m_note_on_number[2] == note_number) {
+      m_lfo.set_pressure<2>(pressure);
+    }
+
+    if (m_note_on_number[3] == note_number) {
+      m_lfo.set_pressure<3>(pressure);
+    }
+  }
+
+  /* INLINE */ void __not_in_flash_func(after_touch_channel)(uint8_t pressure) {
+    m_lfo.set_pressure<0>(pressure);
+    m_lfo.set_pressure<1>(pressure);
+    m_lfo.set_pressure<2>(pressure);
+    m_lfo.set_pressure<3>(pressure);
+  }
+
+  /* INLINE */ void __not_in_flash_func(program_change)(uint8_t program_number) {
     if (program_number > PROGRAM_NUMBER_MAX) {
       if ((program_number == 128) || (program_number == 129)) {
         for (uint32_t i = 0; i < sizeof(s_program_table_panel_parameters) / sizeof(s_program_table_panel_parameters[0]); ++i) {
@@ -1178,41 +1254,41 @@ if constexpr (BYPASS_FX == false) {
     }
   }
 
-  /* INLINE */ void write_parameters_to_program(uint8_t program_number_to_write) {
-    if (program_number_to_write <= PRESET_PROGRAM_NUMBER_MAX) {
+  /* INLINE */ void __not_in_flash_func(write_parameters_to_program)(uint8_t program_number_to_write) {
+    if ((program_number_to_write > USER_PROGRAM_NUMBER_MAX) && (program_number_to_write != 128)) {
       return;
     }
 
-    if (program_number_to_write <= PROGRAM_NUMBER_MAX) {
-      for (uint32_t i = 0; i < sizeof(s_program_table_parameters) / sizeof(s_program_table_parameters[0]); ++i) {
-        uint32_t control_number = s_program_table_parameters[i];
-        m_program_table[control_number][program_number_to_write] = m_current_controller_value_table[control_number];
-      }
+    if (program_number_to_write <= USER_PROGRAM_NUMBER_MAX) {
+        for (uint32_t i = 0; i < sizeof(s_program_table_parameters) / sizeof(s_program_table_parameters[0]); ++i) {
+          uint32_t control_number = s_program_table_parameters[i];
+          m_program_table[control_number][program_number_to_write] = m_current_controller_value_table[control_number];
+        }
     }
 
-#if defined(PRA32_U_USE_CONTROL_PANEL)
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
     if (program_number_to_write == 128) {
       for (uint32_t i = 0; i < sizeof(s_program_table_panel_parameters) / sizeof(s_program_table_panel_parameters[0]); ++i) {
         uint32_t control_number = s_program_table_panel_parameters[i];
         m_program_table_panel[0][control_number] = m_current_controller_value_table[control_number];
       }
     }
-#endif  // defined(PRA32_U_USE_CONTROL_PANEL)
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 
 #if defined(ARDUINO_ARCH_RP2040)
 
-#if defined(PRA32_U_USE_EMULATED_EEPROM)
+#if defined(PRA32_U2_USE_EMULATED_EEPROM)
     if (program_number_to_write <= PROGRAM_NUMBER_MAX) {
       for (uint32_t i = 0; i < sizeof(s_program_table_parameters) / sizeof(s_program_table_parameters[0]); ++i) {
         uint32_t control_number = s_program_table_parameters[i];
-        EEPROM.write(program_number_to_write * 128 + control_number, m_current_controller_value_table[control_number]);
+        EEPROM.write(1024 + program_number_to_write * 128 + control_number, m_current_controller_value_table[control_number]);
       }
 
-      EEPROM.write(program_number_to_write * 128,     'U');
-      EEPROM.write(program_number_to_write * 128 + 1, program_number_to_write);
+      EEPROM.write(1024 + program_number_to_write * 128,     'U');
+      EEPROM.write(1024 + program_number_to_write * 128 + 1, program_number_to_write);
     }
 
-#if defined(PRA32_U_USE_CONTROL_PANEL)
+#if defined(PRA32_U2_USE_CONTROL_PANEL)
     if (program_number_to_write == 128) {
       for (uint32_t i = 0; i < sizeof(s_program_table_panel_parameters) / sizeof(s_program_table_panel_parameters[0]); ++i) {
         uint32_t control_number = s_program_table_panel_parameters[i];
@@ -1222,15 +1298,15 @@ if constexpr (BYPASS_FX == false) {
       EEPROM.write(0, 'P');
       EEPROM.write(1, 0);
     }
-#endif  // defined(PRA32_U_USE_CONTROL_PANEL)
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 
-#if defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+#if defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
 
-#else  // defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+#else  // defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
 
-#if defined(PRA32_U_I2S_DAC_MUTE_OFF_PIN)
-    digitalWrite(PRA32_U_I2S_DAC_MUTE_OFF_PIN, LOW);
-#endif  // defined(PRA32_U_I2S_DAC_MUTE_OFF_PIN)
+#if defined(PRA32_U2_I2S_DAC_MUTE_OFF_PIN)
+    digitalWrite(PRA32_U2_I2S_DAC_MUTE_OFF_PIN, LOW);
+#endif  // defined(PRA32_U2_I2S_DAC_MUTE_OFF_PIN)
 
     g_i2s_output.end();
 
@@ -1238,223 +1314,210 @@ if constexpr (BYPASS_FX == false) {
 
     g_i2s_output.begin();
 
-#if defined(PRA32_U_I2S_DAC_MUTE_OFF_PIN)
-    digitalWrite(PRA32_U_I2S_DAC_MUTE_OFF_PIN, HIGH);
-#endif  // defined(PRA32_U_I2S_DAC_MUTE_OFF_PIN)
+#if defined(PRA32_U2_I2S_DAC_MUTE_OFF_PIN)
+    digitalWrite(PRA32_U2_I2S_DAC_MUTE_OFF_PIN, HIGH);
+#endif  // defined(PRA32_U2_I2S_DAC_MUTE_OFF_PIN)
 
-#endif  // defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+#endif  // defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
 
-#endif  // defined(PRA32_U_USE_EMULATED_EEPROM)
+#endif  // defined(PRA32_U2_USE_EMULATED_EEPROM)
 
 #endif  // defined(ARDUINO_ARCH_RP2040)
   }
 
-  INLINE int16_t process(int16_t mono_input, int16_t& right_level) {
+template <boolean BYPASS_SYNTH = false, boolean BYPASS_FX = false, boolean RESTRICT_SAW = false, boolean RESTRICT_SQR_WT = false>
+  /* INLINE */ int16_t __not_in_flash_func(process)(int32_t audio_input_l_int32, int32_t audio_input_r_int32, int16_t& right_output_int16, int32_t& audio_output_l_int32 = s_placeholder_int32, int32_t& audio_output_r_int32 = s_placeholder_int32) {
+    int16_t noise_int15;
+    int32_t panner_output_r;
+    int32_t panner_output_l;
+
+if constexpr (BYPASS_SYNTH == false) {
+
     ++m_count;
 
-    int16_t noise_int15 = m_noise_gen.process();
-
-    switch (m_count & (0x04 - 1)) {
-    case 0x00:
-      m_eg[0].process_at_low_rate();
-      m_eg[1].process_at_low_rate();
-      break;
-    case 0x01:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_eg[2].process_at_low_rate();
-      m_eg[3].process_at_low_rate();
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      break;
-    case 0x02:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_eg[4].process_at_low_rate();
-      m_eg[5].process_at_low_rate();
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      break;
-    case 0x03:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_eg[6].process_at_low_rate();
-      m_eg[7].process_at_low_rate();
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_lfo.process_at_low_rate(m_count >> 2, noise_int15);
-      break;
-    }
-
-    int16_t lfo_output = m_lfo.get_output();
+    noise_int15 = m_noise_gen.process();
 
     switch (m_count & (0x04 - 1)) {
     case 0x00:
       {
-        m_osc.process_at_low_rate_a<0>(lfo_output, m_eg[0].get_output());
-        m_osc.process_at_low_rate_b(m_count >> 2, noise_int15);
-        uint16_t osc_pitch_0 = (60 << 8);
-        if (m_voice_mode != VOICE_PARAPHONIC) {
-          osc_pitch_0 = m_osc.get_osc_pitch(0);
-        }
-        m_filter[0].process_at_low_rate(m_count >> 2, m_eg[0].get_output(), lfo_output, osc_pitch_0);
+        m_lfo.process_at_low_rate(m_count >> 2, noise_int15);
+
+        m_eg[0].process_at_low_rate();
+        m_eg[1].process_at_low_rate();
+        int16_t lfo_output = m_lfo.get_output<0>();
+        m_osc.process_at_low_rate<0>(m_count >> 2, lfo_output, m_eg[0].get_output(), noise_int15);
+        m_filter[0].process_at_low_rate(m_count >> 2, m_eg[0].get_output(), lfo_output, m_osc.get_osc_pitch(0));
         m_amp[0].process_at_low_rate(m_eg[1].get_output());
       }
       break;
     case 0x01:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_osc.process_at_low_rate_a<1>(lfo_output, m_eg[2].get_output());
-      m_filter[1].process_at_low_rate(m_count >> 2, m_eg[2].get_output(), lfo_output, m_osc.get_osc_pitch(1));
-      m_amp[1].process_at_low_rate(m_eg[3].get_output());
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
+      {
+        m_osc.process_at_low_rate_global();
+
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+if constexpr (RESTRICT_POLY == false) {
+        m_eg[2].process_at_low_rate();
+        m_eg[3].process_at_low_rate();
+        int16_t lfo_output = m_lfo.get_output<1>();
+        m_osc.process_at_low_rate<1>(m_count >> 2, lfo_output, m_eg[2].get_output(), noise_int15);
+        m_filter[1].process_at_low_rate(m_count >> 2, m_eg[2].get_output(), lfo_output, m_osc.get_osc_pitch(1));
+        m_amp[1].process_at_low_rate(m_eg[3].get_output());
+}
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+        m_panner.process_at_low_rate();
+      }
       break;
     case 0x02:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_osc.process_at_low_rate_a<2>(lfo_output, m_eg[4].get_output());
-      m_filter[2].process_at_low_rate(m_count >> 2, m_eg[4].get_output(), lfo_output, m_osc.get_osc_pitch(2));
-      m_amp[2].process_at_low_rate(m_eg[5].get_output());
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-if constexpr (BYPASS_FX == false) {
-      m_delay_fx.process_at_low_rate(m_count >> 2);
+      {
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+if constexpr (RESTRICT_POLY == false) {
+        m_eg[4].process_at_low_rate();
+        m_eg[5].process_at_low_rate();
+        int16_t lfo_output = m_lfo.get_output<2>();
+        m_osc.process_at_low_rate<2>(m_count >> 2, lfo_output, m_eg[4].get_output(), noise_int15);
+        m_filter[2].process_at_low_rate(m_count >> 2, m_eg[4].get_output(), lfo_output, m_osc.get_osc_pitch(2));
+        m_amp[2].process_at_low_rate(m_eg[5].get_output());
 }
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+if constexpr (NO_FX == false) {
+        m_chorus_fx.process_at_low_rate(m_count >> 2);
+}
+      }
       break;
     case 0x03:
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-      m_osc.process_at_low_rate_a<3>(lfo_output, m_eg[6].get_output());
-      m_filter[3].process_at_low_rate(m_count >> 2, m_eg[6].get_output(), lfo_output, m_osc.get_osc_pitch(3));
-      m_amp[3].process_at_low_rate(m_eg[7].get_output());
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
-if constexpr (BYPASS_FX == false) {
-      m_chorus_fx.process_at_low_rate(m_count >> 2);
+      {
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+if constexpr (RESTRICT_POLY == false) {
+        m_eg[6].process_at_low_rate();
+        m_eg[7].process_at_low_rate();
+        int16_t lfo_output = m_lfo.get_output<3>();
+        m_osc.process_at_low_rate<3>(m_count >> 2, lfo_output, m_eg[6].get_output(), noise_int15);
+        m_filter[3].process_at_low_rate(m_count >> 2, m_eg[6].get_output(), lfo_output, m_osc.get_osc_pitch(3));
+        m_amp[3].process_at_low_rate(m_eg[7].get_output());
 }
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+if constexpr (NO_FX == false) {
+        m_delay_fx.process_at_low_rate(m_count >> 2);
+}
+      }
       break;
     }
 
-    int16_t osc_output   [4];
-    int16_t filter_output[4];
-    int16_t amp_output   [4];
-    int16_t voice_mixer_output;
+    int32_t osc_output   [4];
+    int32_t filter_output[4];
+    int32_t amp_output   [4];
+
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+    m_secondary_core_processing_argument = noise_int15;
+    m_secondary_core_processing_request = 1;
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+    osc_output   [0] = m_osc      .process<0, SYNTH_ID, RESTRICT_SAW, RESTRICT_SQR_WT>(noise_int15);
+    filter_output[0] = m_filter[0].process(osc_output   [0]);
+    amp_output   [0] = m_amp   [0].process(filter_output[0]);
+
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+if constexpr (RESTRICT_POLY == false) {
+    osc_output   [1] = m_osc      .process<1, SYNTH_ID, RESTRICT_SAW, RESTRICT_SQR_WT>(noise_int15);
+    filter_output[1] = m_filter[1].process(osc_output   [1]);
+    amp_output   [1] = m_amp   [1].process(filter_output[1]);
+} else {
+    amp_output   [1] = 0;
+}
+#else  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+    amp_output   [1] = 0;
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+#if defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+if constexpr (RESTRICT_POLY == false) {
+    secondary_core_process<RESTRICT_SAW, RESTRICT_SQR_WT>();
+}
+#else  // defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING)
+    while (m_secondary_core_processing_request) {
+      ;
+    }
+#else  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING)
+    m_secondary_core_processing_result = 0;
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING)
+
+#endif  // defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
+
+    int32_t voice_mixer_output;
+
     if (m_voice_mode == VOICE_POLYPHONIC) {
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      m_secondary_core_processing_argument = noise_int15;
-      m_secondary_core_processing_request = 1;
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-
-      osc_output   [0] = m_osc      .process<0>(noise_int15);
-      filter_output[0] = m_filter[0].process(osc_output   [0] << 2);
-      amp_output   [0] = m_amp   [0].process(filter_output[0]);
-
-      osc_output   [1] = m_osc      .process<1>(noise_int15);
-      filter_output[1] = m_filter[1].process(osc_output   [1] << 2);
-      amp_output   [1] = m_amp   [1].process(filter_output[1]);
-
-      int32_t amp_output_sum_a = amp_output[0] + amp_output[1];
-
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      while (m_secondary_core_processing_request) {
-        ;
-      }
-      int32_t amp_output_sum_b = m_secondary_core_processing_result;
-#else  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      osc_output   [2] = m_osc      .process<2>(noise_int15);
-      filter_output[2] = m_filter[2].process(osc_output   [2] << 2);
-      amp_output   [2] = m_amp   [2].process(filter_output[2]);
-
-      osc_output   [3] = m_osc      .process<3>(noise_int15);
-      filter_output[3] = m_filter[3].process(osc_output   [3] << 2);
-      amp_output   [3] = m_amp   [3].process(filter_output[3]);
-
-      int32_t amp_output_sum_b = amp_output[2] + amp_output[3];
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-
-      voice_mixer_output = (amp_output_sum_a + amp_output_sum_b) >> 2;
-    } else if (m_voice_mode == VOICE_PARAPHONIC) {
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      m_secondary_core_processing_argument = noise_int15;
-      m_secondary_core_processing_request = 1;
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-
-      osc_output[0] = m_osc.process<0>(noise_int15);
-      osc_output[1] = m_osc.process<1>(noise_int15);
-
-      int32_t osc_output_sum_a = osc_output[0] + osc_output[1];
-
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      while (m_secondary_core_processing_request) {
-        ;
-      }
-      int16_t osc_output_sum_b = m_secondary_core_processing_result;
-#else  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      osc_output[2] = m_osc.process<2>(noise_int15);
-      osc_output[3] = m_osc.process<3>(noise_int15);
-
-      int16_t osc_output_sum_b = osc_output[2] + osc_output[3];
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-
-      int16_t osc_mixer_output = (osc_output_sum_a + osc_output_sum_b);
-
-      filter_output[0] = m_filter[0].process(osc_mixer_output);
-      amp_output   [0] = m_amp   [0].process(filter_output[0]);
-
-      voice_mixer_output = amp_output[0];
+      voice_mixer_output = amp_output[0] + amp_output[1] + m_secondary_core_processing_result;
     } else {
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      m_secondary_core_processing_argument = 0;
-      m_secondary_core_processing_request = 1;
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-
-      osc_output[0] = m_osc.process<0>(noise_int15);
-      int16_t osc_mixer_output = osc_output[0] << 1;
-
-      filter_output[0] = m_filter[0].process(osc_mixer_output);
-      amp_output   [0] = m_amp   [0].process(filter_output[0]);
-
+if constexpr (MONO_LEVEL_DOWN == false) {
+      voice_mixer_output = amp_output[0] + (amp_output[0] >> 1);
+} else {
       voice_mixer_output = amp_output[0];
-
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
-      // Wait
-      for (volatile uint32_t i = 0; i < 30; ++i) {
-        ;
-      }
-
-      while (m_secondary_core_processing_request) {
-        ;
-      }
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
+}
     }
 
-#if 1
-    // Increase the output level using Extra Amp and Limiter
+    panner_output_l = m_panner.process(voice_mixer_output, panner_output_r);
 
-    // voice_mixer_output_clamped = clamp((voice_mixer_output << 1) + mono_input, (-INT16_MAX), (+INT16_MAX))
-    volatile int32_t voice_mixer_output_clamped = (voice_mixer_output << 1) + mono_input - (+INT16_MAX);
-    voice_mixer_output_clamped = (voice_mixer_output_clamped < 0) * voice_mixer_output_clamped + (+INT16_MAX) - (-INT16_MAX);
-    voice_mixer_output_clamped = (voice_mixer_output_clamped > 0) * voice_mixer_output_clamped + (-INT16_MAX);
+} else {
 
-    voice_mixer_output = voice_mixer_output_clamped;
-#endif
+    noise_int15 = m_noise_gen.get();
+    panner_output_r = 0;
+    panner_output_l = 0;
 
-    int16_t chorus_fx_output_r;
-    int16_t chorus_fx_output_l;
+}
 
-    int16_t delay_fx_output_r;
-    int16_t delay_fx_output_l;
+    int32_t mixed_output_r;
+    int32_t mixed_output_l;
 
-if constexpr (BYPASS_FX == false) {
-    chorus_fx_output_l = m_chorus_fx.process(voice_mixer_output, chorus_fx_output_r);
+if constexpr (EXT_INPUT == false) {
+    mixed_output_r = panner_output_r;
+    mixed_output_l = panner_output_l;
+} else {
+    mixed_output_r = panner_output_r + audio_input_r_int32;
+    mixed_output_l = panner_output_l + audio_input_l_int32;
+}
+
+    int32_t chorus_fx_output_r;
+    int32_t chorus_fx_output_l;
+
+    int32_t delay_fx_output_r;
+    int32_t delay_fx_output_l;
+
+if constexpr ((NO_FX == false) && (BYPASS_FX == false)) {
+    chorus_fx_output_l = m_chorus_fx.process(mixed_output_l, mixed_output_r, chorus_fx_output_r);
 
     delay_fx_output_l = m_delay_fx.process(chorus_fx_output_l, chorus_fx_output_r, delay_fx_output_r);
 } else {
-    delay_fx_output_r = voice_mixer_output;
-    delay_fx_output_l = voice_mixer_output;
+    delay_fx_output_r = mixed_output_r;
+    delay_fx_output_l = mixed_output_l;
 }
 
-#if defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
-#if defined(PRA32_U_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
+    int32_t synth_output_r = clamp(delay_fx_output_r, (-(INT16_MAX << 8)), (+(INT16_MAX << 8)));
+    int32_t synth_output_l = clamp(delay_fx_output_l, (-(INT16_MAX << 8)), (+(INT16_MAX << 8)));
+
+if constexpr (EXT_OUTPUT) {
+    audio_output_r_int32 = synth_output_r;
+    audio_output_l_int32 = synth_output_l;
+}
+
+#if defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+    int16_t synth_output_l_int16 = (synth_output_l >> 8);
+    int16_t synth_output_r_int16 = (synth_output_r >> 8);
+
+#if defined(PRA32_U2_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
     // Dithering
-    right_level = delay_fx_output_r + (((noise_int15 + 16384) >> 11) - 8);
-    return        delay_fx_output_l + (((noise_int15 + 16384) >> 11) - 8);
-#else  // defined(PRA32_U_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
+    right_output_int16 = synth_output_r_int16 + (((noise_int15 + 16384) >> 11) - 8);
+    return               synth_output_l_int16 + (((noise_int15 + 16384) >> 11) - 8);
+#else  // defined(PRA32_U2_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
     // Error diffusion
     static uint16_t s_output_error_l = 0;
     static uint16_t s_output_error_r = 0;
 
-    uint32_t pwm_audio_l = delay_fx_output_l + 0x8000;
-    uint32_t pwm_audio_r = delay_fx_output_r + 0x8000;
+    uint32_t pwm_audio_l = synth_output_l_int16 + 0x8000;
+    uint32_t pwm_audio_r = synth_output_r_int16 + 0x8000;
     pwm_audio_l +=  ((noise_int15 + 16384) >> 14);
     pwm_audio_r += !((noise_int15 + 16384) >> 14);
     pwm_audio_l *= 3125;
@@ -1467,49 +1530,48 @@ if constexpr (BYPASS_FX == false) {
     s_output_error_l = pwm_audio_l & 0xFFFF;
     s_output_error_r = pwm_audio_r & 0xFFFF;
 
-    right_level = delay_fx_output_r + (prev_output_error_r > s_output_error_r) * 22;
-    return        delay_fx_output_l + (prev_output_error_l > s_output_error_l) * 22;
-#endif  // defined(PRA32_U_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
-#else  // defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
-    right_level = delay_fx_output_r;
-    return        delay_fx_output_l;
-#endif  // defined(PRA32_U_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+    right_output_int16 = synth_output_r_int16 + (prev_output_error_r > s_output_error_r) * 22;
+    return               synth_output_l_int16 + (prev_output_error_l > s_output_error_l) * 22;
+#endif  // defined(PRA32_U2_USE_PWM_AUDIO_DITHERING_INSTEAD_OF_ERROR_DIFFUSION)
+#else  // defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
+#if 1
+    // Dithering
+    int16_t synth_output_l_int16 = ((synth_output_l + ((noise_int15 + 16384) >> 7)) >> 8);
+    int16_t synth_output_r_int16 = ((synth_output_r + ((noise_int15 + 16384) >> 7)) >> 8);
+#else
+    int16_t synth_output_l_int16 = (synth_output_l >> 8);
+    int16_t synth_output_r_int16 = (synth_output_r >> 8);
+#endif
+
+    right_output_int16 = synth_output_r_int16;
+    return               synth_output_l_int16;
+#endif  // defined(PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S)
   }
 
-  INLINE boolean secondary_core_process() {
+  template <boolean RESTRICT_SAW = false, boolean RESTRICT_SQR_WT = false>
+  /* INLINE */ boolean __not_in_flash_func(secondary_core_process)() {
     boolean processed = false;
 
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
     if (m_secondary_core_processing_request == 1) {
       int16_t noise_int15 = static_cast<int16_t>(m_secondary_core_processing_argument);
 
-      int16_t osc_output   [4];
-      int16_t filter_output[4];
-      int16_t amp_output   [4];
+      int32_t osc_output   [4];
+      int32_t filter_output[4];
+      int32_t amp_output   [4];
 
-      if (m_voice_mode == VOICE_POLYPHONIC) {
-        osc_output   [2] = m_osc      .process<2>(noise_int15);
-        filter_output[2] = m_filter[2].process(osc_output   [2] << 2);
-        amp_output   [2] = m_amp   [2].process(filter_output[2]);
+      osc_output   [2] = m_osc      .process<2, SYNTH_ID, RESTRICT_SAW, RESTRICT_SQR_WT>(noise_int15);
+      filter_output[2] = m_filter[2].process(osc_output   [2]);
+      amp_output   [2] = m_amp   [2].process(filter_output[2]);
 
-        osc_output   [3] = m_osc      .process<3>(noise_int15);
-        filter_output[3] = m_filter[3].process(osc_output   [3] << 2);
-        amp_output   [3] = m_amp   [3].process(filter_output[3]);
+      osc_output   [3] = m_osc      .process<3, SYNTH_ID, RESTRICT_SAW, RESTRICT_SQR_WT>(noise_int15);
+      filter_output[3] = m_filter[3].process(osc_output   [3]);
+      amp_output   [3] = m_amp   [3].process(filter_output[3]);
 
-        m_secondary_core_processing_result = amp_output[2] + amp_output[3];
-      } else if (m_voice_mode == VOICE_PARAPHONIC) {
-        osc_output[2] = m_osc.process<2>(noise_int15);
-        osc_output[3] = m_osc.process<3>(noise_int15);
-
-        m_secondary_core_processing_result = osc_output[2] + osc_output[3];
-      } else {
-        m_secondary_core_processing_result = 0;
-      }
+      m_secondary_core_processing_result = amp_output[2] + amp_output[3];
 
       m_secondary_core_processing_request = 0;
       processed = true;
     }
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING)
 
     return processed;
   }
@@ -1555,16 +1617,21 @@ private:
   }
 
   INLINE void set_voice_mode(uint8_t controller_value) {
-#if defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
+#if defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
     static uint8_t voice_mode_table[6] = {
       VOICE_POLYPHONIC,
-      VOICE_PARAPHONIC,
+      VOICE_POLYPHONIC,
       VOICE_MONOPHONIC,
       VOICE_MONOPHONIC,
       VOICE_LEGATO_PORTA,
       VOICE_LEGATO,
     };
-#else  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
+if constexpr (RESTRICT_POLY == false) {
+} else {
+    voice_mode_table[0] = VOICE_MONOPHONIC;
+    voice_mode_table[1] = VOICE_MONOPHONIC;
+}
+#else  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
     static uint8_t voice_mode_table[6] = {
       VOICE_MONOPHONIC,
       VOICE_MONOPHONIC,
@@ -1573,24 +1640,14 @@ private:
       VOICE_LEGATO_PORTA,
       VOICE_LEGATO,
     };
-#endif  // defined(PRA32_U_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U_EMULATION)
+#endif  // defined(PRA32_U2_USE_2_CORES_FOR_SIGNAL_PROCESSING) || defined(PRA32_U2_ENABLE_POLY_ON_1_CORE)
 
-    volatile int32_t index = ((controller_value * 10) + 127) / 254;
-
-    // index = min(index, 5)
-    index = index - 5;
-    index = (index < 0) * index + 5;
+    int32_t index = ((controller_value * 10) + 127) / 254;
 
     uint8_t new_voice_mode = voice_mode_table[index];
-#if 1
-    if (controller_value < 6) {
-      new_voice_mode = voice_mode_table[controller_value];
-    }
-#endif
     if (m_voice_mode != new_voice_mode) {
       m_voice_mode = new_voice_mode;
       all_notes_off();
-      m_osc.set_gate_enabled(m_voice_mode == VOICE_PARAPHONIC);
     }
   }
 
@@ -1677,59 +1734,79 @@ private:
   }
 
   INLINE void update_eg_osc_mod() {
-#if 1
-    if        (m_eg_osc_dst == 2 || m_eg_osc_dst >= 96) {  /* OSC_DST_SHAPE_1 */
-#else
-    if        (m_eg_osc_dst >= 96) {  /* OSC_DST_SHAPE_1 */
-#endif
+    if        (m_eg_osc_dst >= 89) {  /* MOD_DST_SHAPE_1 */
       m_osc.set_pitch_eg_amt<0>(64);
       m_osc.set_pitch_eg_amt<1>(64);
       m_osc.set_shape_eg_amt(m_eg_osc_amt);
-#if 1
-    } else if (m_eg_osc_dst == 1 || m_eg_osc_dst >= 32) {  /* OSC_DST_PITCH_2 */
-#else
-    } else if (m_eg_osc_dst >= 32) {  /* OSC_DST_PITCH_2 */
-#endif
+      m_filter[0].set_cutoff_eg_amt(1, 64);
+      m_filter[1].set_cutoff_eg_amt(1, 64);
+      m_filter[2].set_cutoff_eg_amt(1, 64);
+      m_filter[3].set_cutoff_eg_amt(1, 64);
+    } else if (m_eg_osc_dst >= 39) {  /* MOD_DST_PITCH_2 */
       m_osc.set_pitch_eg_amt<0>(64);
       m_osc.set_pitch_eg_amt<1>(m_eg_osc_amt);
       m_osc.set_shape_eg_amt(64);
-    } else {                         /* OSC_DST_PITCH */
+      m_filter[0].set_cutoff_eg_amt(1, 64);
+      m_filter[1].set_cutoff_eg_amt(1, 64);
+      m_filter[2].set_cutoff_eg_amt(1, 64);
+      m_filter[3].set_cutoff_eg_amt(1, 64);
+    } else if (m_eg_osc_dst >= 13) {  /* MOD_DST_CUTOFF */
+      m_osc.set_pitch_eg_amt<0>(64);
+      m_osc.set_pitch_eg_amt<1>(64);
+      m_osc.set_shape_eg_amt(64);
+      m_filter[0].set_cutoff_eg_amt(1, m_eg_osc_amt);
+      m_filter[1].set_cutoff_eg_amt(1, m_eg_osc_amt);
+      m_filter[2].set_cutoff_eg_amt(1, m_eg_osc_amt);
+      m_filter[3].set_cutoff_eg_amt(1, m_eg_osc_amt);
+    } else {                          /* MOD_DST_PITCH */
       m_osc.set_pitch_eg_amt<0>(m_eg_osc_amt);
       m_osc.set_pitch_eg_amt<1>(m_eg_osc_amt);
       m_osc.set_shape_eg_amt(64);
+      m_filter[0].set_cutoff_eg_amt(1, 64);
+      m_filter[1].set_cutoff_eg_amt(1, 64);
+      m_filter[2].set_cutoff_eg_amt(1, 64);
+      m_filter[3].set_cutoff_eg_amt(1, 64);
     }
   }
 
   INLINE void update_lfo_osc_mod() {
-#if 1
-    if        (m_lfo_osc_dst == 2 || m_lfo_osc_dst >= 96) {  /* OSC_DST_SHAPE_1 */
-#else
-    if        (m_lfo_osc_dst >= 96) {  /* OSC_DST_SHAPE_1 */
-#endif
+    if        (m_lfo_osc_dst >= 115) {  /* MOD_DST_SHAPE_1 */
       m_osc.set_pitch_lfo_amt<0>(64);
       m_osc.set_pitch_lfo_amt<1>(64);
       m_osc.set_shape_lfo_amt(m_lfo_osc_amt);
-#if 1
-    } else if (m_lfo_osc_dst == 1 || m_lfo_osc_dst >= 32) {  /* OSC_DST_PITCH_2 */
-#else
-    } else if (m_lfo_osc_dst >= 32) {  /* OSC_DST_PITCH_2 */
-#endif
+      m_filter[0].set_cutoff_lfo_amt(1, 64);
+      m_filter[1].set_cutoff_lfo_amt(1, 64);
+      m_filter[2].set_cutoff_lfo_amt(1, 64);
+      m_filter[3].set_cutoff_lfo_amt(1, 64);
+    } else if (m_lfo_osc_dst >= 89) {  /* MOD_DST_CUTOFF */
+      m_osc.set_pitch_lfo_amt<0>(64);
+      m_osc.set_pitch_lfo_amt<1>(64);
+      m_osc.set_shape_lfo_amt(64);
+      m_filter[0].set_cutoff_lfo_amt(1, m_lfo_osc_amt);
+      m_filter[1].set_cutoff_lfo_amt(1, m_lfo_osc_amt);
+      m_filter[2].set_cutoff_lfo_amt(1, m_lfo_osc_amt);
+      m_filter[3].set_cutoff_lfo_amt(1, m_lfo_osc_amt);
+    } else if (m_lfo_osc_dst >= 39) {  /* MOD_DST_PITCH_2 */
       m_osc.set_pitch_lfo_amt<0>(64);
       m_osc.set_pitch_lfo_amt<1>(m_lfo_osc_amt);
       m_osc.set_shape_lfo_amt(64);
-    } else {                         /* OSC_DST_PITCH */
+      m_filter[0].set_cutoff_lfo_amt(1, 64);
+      m_filter[1].set_cutoff_lfo_amt(1, 64);
+      m_filter[2].set_cutoff_lfo_amt(1, 64);
+      m_filter[3].set_cutoff_lfo_amt(1, 64);
+    } else {                           /* MOD_DST_PITCH */
       m_osc.set_pitch_lfo_amt<0>(m_lfo_osc_amt);
       m_osc.set_pitch_lfo_amt<1>(m_lfo_osc_amt);
       m_osc.set_shape_lfo_amt(64);
+      m_filter[0].set_cutoff_lfo_amt(1, 64);
+      m_filter[1].set_cutoff_lfo_amt(1, 64);
+      m_filter[2].set_cutoff_lfo_amt(1, 64);
+      m_filter[3].set_cutoff_lfo_amt(1, 64);
     }
   }
 
   INLINE void update_eg_and_amp_eg() {
-#if 1
-    if (m_controller_value_eg_amp_mod == 1 || m_controller_value_eg_amp_mod >= 64) {
-#else
     if (m_controller_value_eg_amp_mod >= 64) {
-#endif
       m_eg[0].set_attack  (m_controller_value_eg_attack);
       m_eg[1].set_attack  (m_controller_value_eg_attack);
       m_eg[2].set_attack  (m_controller_value_eg_attack);
@@ -1757,11 +1834,7 @@ private:
       m_eg[6].set_sustain (m_controller_value_eg_sustain);
       m_eg[7].set_sustain (m_controller_value_eg_sustain);
 
-#if 1
-      if (m_controller_value_rel_eq_decay == 1 || m_controller_value_rel_eq_decay >= 64) {
-#else
       if (m_controller_value_rel_eq_decay >= 64) {
-#endif
         m_eg[0].set_release (m_controller_value_eg_decay);
         m_eg[1].set_release (m_controller_value_eg_decay);
         m_eg[2].set_release (m_controller_value_eg_decay);
@@ -1808,11 +1881,7 @@ private:
       m_eg[6].set_sustain (m_controller_value_eg_sustain);
       m_eg[7].set_sustain (m_controller_value_amp_sustain);
 
-#if 1
-      if (m_controller_value_rel_eq_decay == 1 || m_controller_value_rel_eq_decay >= 64) {
-#else
       if (m_controller_value_rel_eq_decay >= 64) {
-#endif
         m_eg[0].set_release (m_controller_value_eg_decay);
         m_eg[1].set_release (m_controller_value_amp_decay);
         m_eg[2].set_release (m_controller_value_eg_decay);

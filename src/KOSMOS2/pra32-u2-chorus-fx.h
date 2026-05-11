@@ -1,15 +1,15 @@
 #pragma once
 
-#include "pra32-u-common.h"
+#include "pra32-u2-common.h"
 
-class PRA32_U_ChorusFx {
+class PRA32_U2_ChorusFx {
   static const uint16_t DELAY_BUFF_SIZE = 512;
 
-  int16_t  m_delay_buff[DELAY_BUFF_SIZE];
-  uint16_t m_delay_wp;
+  int32_t  m_delay_buff[2][DELAY_BUFF_SIZE];
+  uint16_t m_delay_wp[2];
 
-  uint16_t m_chorus_mix_control;
-  uint16_t m_chorus_mix_control_effective;
+  uint16_t m_chorus_level_control;
+  uint16_t m_chorus_level_control_effective;
   uint16_t m_chorus_depth_control;
   uint16_t m_chorus_depth_control_effective;
   uint32_t m_chorus_rate_control;
@@ -19,13 +19,16 @@ class PRA32_U_ChorusFx {
   uint32_t m_chorus_lfo_phase;
   uint16_t m_chorus_delay_time[2];
 
+  int32_t  m_prev_sample_to_push_0;
+  int32_t  m_prev_sample_to_push_1;
+
 public:
-  PRA32_U_ChorusFx()
+  PRA32_U2_ChorusFx()
   : m_delay_buff()
   , m_delay_wp()
 
-  , m_chorus_mix_control()
-  , m_chorus_mix_control_effective()
+  , m_chorus_level_control()
+  , m_chorus_level_control_effective()
   , m_chorus_depth_control()
   , m_chorus_depth_control_effective()
   , m_chorus_rate_control()
@@ -33,8 +36,12 @@ public:
   , m_chorus_delay_time_control_effective()
   , m_chorus_lfo_phase()
   , m_chorus_delay_time()
+
+  , m_prev_sample_to_push_0()
+  , m_prev_sample_to_push_1()
   {
-    m_delay_wp = DELAY_BUFF_SIZE - 1;
+    m_delay_wp[0] = DELAY_BUFF_SIZE - 1;
+    m_delay_wp[1] = DELAY_BUFF_SIZE - 1;
 
     set_chorus_depth     (64 );
     set_chorus_rate      (64 );
@@ -60,8 +67,8 @@ public:
     m_chorus_delay_time_control = controller_value << 6;
   }
 
-  INLINE void set_chorus_mix(uint8_t controller_value) {
-    m_chorus_mix_control = (controller_value + 1) >> 1;
+  INLINE void set_chorus_level(uint8_t controller_value) {
+    m_chorus_level_control = (controller_value + 1) >> 1;
   }
 
   template <uint8_t N>
@@ -73,8 +80,8 @@ public:
 #if 1
     static_cast<void>(count);
 
-    m_chorus_mix_control_effective += (m_chorus_mix_control_effective < m_chorus_mix_control);
-    m_chorus_mix_control_effective -= (m_chorus_mix_control_effective > m_chorus_mix_control);
+    m_chorus_level_control_effective += (m_chorus_level_control_effective < m_chorus_level_control);
+    m_chorus_level_control_effective -= (m_chorus_level_control_effective > m_chorus_level_control);
 
     m_chorus_depth_control_effective += (m_chorus_depth_control_effective < m_chorus_depth_control);
     m_chorus_depth_control_effective -= (m_chorus_depth_control_effective > m_chorus_depth_control);
@@ -109,37 +116,52 @@ public:
 #endif
   }
 
-  INLINE int16_t process(int16_t dir_sample, int16_t& right_level) {
-    int16_t eff_sample_0 = delay_buff_get(get_chorus_delay_time<0>());
-    int16_t eff_sample_1 = delay_buff_get(get_chorus_delay_time<1>());
-    delay_buff_push(dir_sample);
+  INLINE int32_t process(int32_t left_input_int24, int32_t right_input_int24, int32_t& right_output_int24) {
+    int32_t eff_sample_0 = delay_buff_get(0, get_chorus_delay_time<0>());
+    int32_t eff_sample_1 = delay_buff_get(1, get_chorus_delay_time<1>());
 
-    right_level = (((dir_sample * (128 - m_chorus_mix_control_effective)) + (eff_sample_1 * m_chorus_mix_control_effective))) >> 7;
-    return        (((dir_sample * (128 - m_chorus_mix_control_effective)) + (eff_sample_0 * m_chorus_mix_control_effective))) >> 7;
+    int32_t curr_sample_to_push_0 = (left_input_int24  * m_chorus_level_control_effective) >> 6;
+    int32_t curr_sample_to_push_1 = (right_input_int24 * m_chorus_level_control_effective) >> 6;
+
+#if 0
+    // Do not apply LPF to the delay component
+    m_prev_sample_to_push_0 = curr_sample_to_push_0;
+    m_prev_sample_to_push_1 = curr_sample_to_push_1;
+#endif
+
+    delay_buff_push(0, (curr_sample_to_push_0 + m_prev_sample_to_push_0) >> 1);
+    delay_buff_push(1, (curr_sample_to_push_1 + m_prev_sample_to_push_1) >> 1);
+
+    m_prev_sample_to_push_0 = curr_sample_to_push_0;
+    m_prev_sample_to_push_1 = curr_sample_to_push_1;
+
+    right_output_int24 = right_input_int24 + eff_sample_1;
+    return               left_input_int24  + eff_sample_0;
   }
 
 private:
-  INLINE void delay_buff_push(int16_t audio_input) {
-    m_delay_wp = (m_delay_wp + 1) & (DELAY_BUFF_SIZE - 1);
-    m_delay_buff[m_delay_wp] = audio_input;
+  INLINE void delay_buff_push(uint32_t lr, int32_t audio_input_int24) {
+    m_delay_wp[lr] = (m_delay_wp[lr] + 1) & (DELAY_BUFF_SIZE - 1);
+    m_delay_buff[lr][m_delay_wp[lr]] = audio_input_int24;
   }
 
-  INLINE int16_t delay_buff_get(uint16_t sample_delay) {
-    uint16_t curr_index  = (m_delay_wp - (sample_delay >> 4)) & (DELAY_BUFF_SIZE - 1);
+  INLINE int32_t delay_buff_get(uint32_t lr, uint16_t sample_delay) {
+    uint16_t curr_index  = (m_delay_wp[lr] - (sample_delay >> 4)) & (DELAY_BUFF_SIZE - 1);
     uint16_t next_index  = (curr_index - 1) & (DELAY_BUFF_SIZE - 1);
     uint16_t next_weight = (sample_delay & 0xF);
-    int16_t  curr_data   = m_delay_buff[curr_index];
-    int16_t  next_data   = m_delay_buff[next_index];
+    int32_t  curr_data   = m_delay_buff[lr][curr_index];
+    int32_t  next_data   = m_delay_buff[lr][next_index];
 
     // lerp
-    int16_t result = curr_data + (((next_data - curr_data) * next_weight) >> 4);
+    int32_t result = curr_data + multiply_shift_right(next_data - curr_data, next_weight << 12, 16);
 
     return result;
   }
 
   INLINE void delay_buff_attenuate() {
     for (uint16_t i = 0; i < DELAY_BUFF_SIZE; ++i) {
-      m_delay_buff[i] = m_delay_buff[i] >> 1;
+      m_delay_buff[0][i] = m_delay_buff[0][i] >> 1;
+      m_delay_buff[1][i] = m_delay_buff[1][i] >> 1;
     }
   }
 

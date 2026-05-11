@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include "pra32-u-common.h"
-#include "pra32-u-eg-table.h"
+#include "pra32-u2-common.h"
+#include "pra32-u2-eg-table.h"
 
-class PRA32_U_EG {
+class PRA32_U2_EG {
   static const uint8_t STATE_ATTACK  = 0;
   static const uint8_t STATE_SUSTAIN = 1;
   static const uint8_t STATE_IDLE    = 2;
@@ -25,7 +25,7 @@ class PRA32_U_EG {
   int32_t m_sustain_level;
 
 public:
-  PRA32_U_EG()
+  PRA32_U2_EG()
   : m_state()
   , m_level()
   , m_level_out()
@@ -71,7 +71,8 @@ public:
       m_note_on_velocity = velocity;
     }
 
-    m_attack_level = ((((m_note_on_velocity * m_velocity_sensitivity) + (127 * (64 - m_velocity_sensitivity))) * 16384) / 127) << 10;
+    m_attack_level = ((((m_note_on_velocity * m_velocity_sensitivity) +
+                        (127 * (64 - m_velocity_sensitivity))) * 16384) / 127) << (EG_LEVEL_MAX_BITS - 20);
     m_sustain_level = (m_attack_level >> 6) * m_sustain;
     m_state = STATE_ATTACK;
   }
@@ -89,28 +90,20 @@ public:
 #if 1
     switch (m_state) {
     case STATE_ATTACK:
-      if (m_level >= EG_LEVEL_MAX) {
-        m_level = EG_LEVEL_MAX;
-        m_state = STATE_SUSTAIN;
-      } else if (m_level >= m_attack_level) {
-        m_state = STATE_SUSTAIN;
-      } else {
-        m_level = ((m_attack_level - 1) << 1) - (mul_s32_s32_h32((((m_attack_level - 1) << 1) - m_level), m_attack_coef) << 2);
-      }
+      m_level = ((m_attack_level - 1) << 1) - (multiply_shift_right((((m_attack_level - 1) << 1) - m_level), m_attack_coef, 32) << 2);
+      m_level = minimum(m_level, EG_LEVEL_MAX);
+      m_state = /* STATE_ATTACK * (m_level < m_attack_level) + */ STATE_SUSTAIN * (m_level >= m_attack_level);
       break;
 
     case STATE_SUSTAIN:
       {
-        // effective_sustain = min(m_sustain_level, m_level)
-        int32_t effective_sustain = m_sustain_level - m_level;
-        effective_sustain = (effective_sustain < 0) * effective_sustain + m_level;
-
-        m_level = effective_sustain + (mul_s32_s32_h32((m_level - effective_sustain), m_decay_coef) << 2);
+        int32_t effective_sustain = minimum(m_sustain_level, m_level);
+        m_level = effective_sustain + (multiply_shift_right((m_level - effective_sustain), m_decay_coef, 32) << 2);
       }
       break;
 
     case STATE_IDLE:
-      m_level = mul_s32_s32_h32(m_level, m_release_coef) << 2;
+      m_level = multiply_shift_right(m_level, m_release_coef, 32) << 2;
       break;
     }
 
