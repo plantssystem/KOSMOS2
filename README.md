@@ -284,7 +284,17 @@ MIT License
 
 ## 👤 Author
 
-**Sugimoto**
+<table>
+<tr>
+<td width="140">
+  <img src="docs/author.png" width="120" alt="Author Icon">
+</td>
+<td>
+  <b>osamu</b><br>
+  Creator of KOSMOS / plantsystem
+</td>
+</tr>
+</table>
 
 ---
 
