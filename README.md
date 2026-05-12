@@ -6,7 +6,7 @@
 
 ---
 
-![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200.JPG)
+![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200_02.JPG)
 
 ![Version](https://img.shields.io/badge/version-v2.0.0-blue)
 ![Platform](https://img.shields.io/badge/platform-RP2350-orange)
