@@ -8,8 +8,8 @@
 
 ![KOSMOS Screenshot](docs/screenshots/KOSMOS2.JPG)
 
-![Version](https://img.shields.io/badge/version-v1.0.0-blue)
-![Platform](https://img.shields.io/badge/platform-RP2040-orange)
+![Version](https://img.shields.io/badge/version-v2.0.0-blue)
+![Platform](https://img.shields.io/badge/platform-RP2350-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
