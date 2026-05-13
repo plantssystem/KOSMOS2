@@ -86,7 +86,7 @@ flowchart TD
     %% ============================
     %% Core0（UI + ロジック）
     %% ============================
-    CC --> C0[Core0<br/>Pico<br/>UI / Logic]
+    CC --> C0[Core0<br/>Pico2<br/>UI / Logic]
 
     C0 --> PAT[Pattern Engine<br/>A/B/C/D]
     C0 --> RAND[Randomizer<br/>Scale / Transpose / Silence]
@@ -97,9 +97,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U シンセ）
+    %% Core1（PRA32-U2/M シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U Synth]
+    Q --> C1[Core1<br/>PRA32-U2/M Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -172,7 +172,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U）
+## 🎼 4パート構成（PRA32-U2/M）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -248,7 +248,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ---
 
-## 🎛 物理ボタン（Pico）
+## 🎛 物理ボタン（Pico2）
 
 | ボタン | 機能 |
 |--------|------|
@@ -267,7 +267,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 - Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U Synth Engine（Core1）  
+- PRA32-U2/M Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 コントローラー
