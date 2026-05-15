@@ -149,6 +149,7 @@ void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
 *   外部シーケンサからの完全コントロール
 *   TouchOSCでの自由なUI構築
 
+***
 
 この実装によりKOSMOS2は：
 
