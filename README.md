@@ -9,14 +9,14 @@
 ![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200_01.JPG)
 
 ![Version](https://img.shields.io/badge/version-v1.0.0-blue)
-![Platform](https://img.shields.io/badge/platform-RP2040-orange)
+![Platform](https://img.shields.io/badge/platform-RP2350-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico と PRA32-U を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -180,7 +180,7 @@ flowchart TD
     %% ============================
     %% Core0（UI + ロジック）
     %% ============================
-    CC --> C0[Core0<br/>Pico<br/>UI / Logic]
+    CC --> C0[Core0<br/>Pico2<br/>UI / Logic]
 
     C0 --> PAT[Pattern Engine<br/>A/B/C/D]
     C0 --> RAND[Randomizer<br/>Scale / Transpose / Silence]
@@ -342,7 +342,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ---
 
-## 🎛 物理ボタン（Pico）
+## 🎛 物理ボタン（Pico2）
 
 | ボタン | 機能 |
 |--------|------|
@@ -358,7 +358,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ## 📦 ハードウェア構成
 
-- Raspberry Pi **Pico**  
+- Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
 - PRA32-U Synth Engine（Core1）  
