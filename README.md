@@ -64,16 +64,6 @@ KOSMOS2 は、
 
 ---
 
-## ⚠️ Pico2（RP2350）動作検証について
-
-[![Status: Pico2 PRA32-U2/M Evaluation](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20testing-orange.svg)](#kosmos2)
-
-現在、**Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 動作を検証中です。  
-I2S 出力・マルチコア DSP・内蔵シンセ（A/B/C/D 各パート）の安定動作を順次確認しながら、  
-Pico2 向け最適化版として整備していきます。
-
----
-
 ## ✅ MIDI CC フル対応（PRA32-U2 Synth Engine）
 
 PRA32-U2 シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
