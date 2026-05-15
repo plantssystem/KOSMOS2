@@ -149,15 +149,6 @@ void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
 *   外部シーケンサからの完全コントロール
 *   TouchOSCでの自由なUI構築
 
-***
-
-### 💡 仕様ポイント
-
-> ⚠ Programは「初期値」のみであり、実際の音はリアルタイムCCで上書きされます。
-
-***
-
-### 🎹 コンセプト
 
 この実装によりKOSMOS2は：
 
