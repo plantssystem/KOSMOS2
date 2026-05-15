@@ -96,6 +96,8 @@ PRA32-U2  エディタ（HTML版）
 🔗 **PRA32-U2 Editor (permalink)**  
 https://github.com/risgk/digital-synth-pra32-u2/blob/856ab5a96e59a1d2bd22878beea5193ecd17c381/pra32-u2-editor.html
 
+***
+
 ### 🎛 CC処理仕様
 
 #### ■ 内部制御CC（KOSMOS2専用）
