@@ -6,7 +6,7 @@
 
 ---
 
-![KOSMOS Screenshot](docs/screenshots/KOSMOS2.JPG)
+![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200_01.JPG)
 
 ![Version](https://img.shields.io/badge/version-v1.0.0-blue)
 ![Platform](https://img.shields.io/badge/platform-RP2040-orange)
@@ -74,6 +74,99 @@ Pico2 向け最適化版として整備していきます。
 
 ---
 
+## ✅ MIDI CC フル対応（PRA32-U2 Synth Engine）
+
+本バージョンでは、PRA32-U2 シンセエンジンにおける  
+**MIDI CC受信機能をフル対応化**しました。
+
+***
+
+### 🔧 概要
+
+外部MIDI機器や TouchOSC 等から送信される **すべてのMIDI CCメッセージ**を受信し、  
+各シンセパートへリアルタイムに反映できるようになりました。
+
+***
+
+### 🎛 CC処理仕様
+
+#### ■ 内部制御CC（KOSMOS2専用）
+
+以下のCCはシステム制御用として使用されます：
+
+*   **CC20** : Density（発音率）
+*   **CC21** : Pitch Offset（音程）
+*   **CC22** : Speed（テンポ倍率）
+*   **CC23** : Scale（スケール切替）
+*   **CC7**  : Master Volume
+*   **CC30–32** : プログラム操作（ガチャ / リセット / ミュート）
+
+***
+
+#### ■ それ以外のCC（フルパススルー）
+
+上記以外のCCはすべて：
+
+> ✅ **入力されたMIDIチャンネルを維持したままシンセへ転送**
+
+されます。
+
+```cpp
+void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
+    midi_bridge_send_cc(cc, val, ch);
+}
+```
+
+***
+
+### 🎚 MIDIチャンネルとパート対応
+
+| MIDI Channel | Synth Part |
+| ------------ | ---------- |
+| 1 (ch0)      | A          |
+| 2 (ch1)      | B          |
+| 3 (ch2)      | C          |
+| 4 (ch3)      | D          |
+
+※ 内部では 0〜3 のチャンネルで処理されます
+
+***
+
+### 🎵 特徴
+
+*   ✅ すべてのCCに対応（制限なし）
+*   ✅ チャンネル別に4パート独立制御
+*   ✅ 外部MIDI機器 / DAW / TouchOSC に完全対応
+*   ✅ 内部制御CCと音源制御を分離
+*   ✅ リアルタイムパラメータ操作可能
+
+***
+
+### 🚀 できること
+
+*   フィルター（CC74）、レゾナンス（CC71）の操作
+*   エンベロープ / LFO / FXのリアルタイム制御
+*   パートごとの音色変化
+*   外部シーケンサからの完全コントロール
+*   TouchOSCでの自由なUI構築
+
+***
+
+### 💡 仕様ポイント
+
+> ⚠ Programは「初期値」のみであり、実際の音はリアルタイムCCで上書きされます。
+
+***
+
+### 🎹 コンセプト
+
+この実装によりKOSMOS2は：
+
+> **4パート同時制御可能なMIDIマルチシンセ**
+
+として動作します。
+
+---
 ## 🧩 システム構成図
 
 ```mermaid
