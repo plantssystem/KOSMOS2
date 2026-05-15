@@ -16,7 +16,7 @@
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
