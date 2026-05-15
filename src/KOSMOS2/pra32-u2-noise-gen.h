@@ -2,15 +2,15 @@
 
 #pragma once
 
-#include "pra32-u-common.h"
+#include "pra32-u2-common.h"
 
-class PRA32_U_NoiseGen {
+class PRA32_U2_NoiseGen {
   uint32_t m_state_a;
   uint32_t m_state_a_prev;
 
 public:
-  PRA32_U_NoiseGen()
-  : m_state_a(1)
+  PRA32_U2_NoiseGen(uint32_t seed)
+  : m_state_a(1 + seed)
   , m_state_a_prev(0)
   {
   }
@@ -24,6 +24,11 @@ public:
     x ^= x << 5;
     m_state_a = x;
 
+    int16_t noise_int15 = (m_state_a >> 17) - 16384;
+    return noise_int15;
+  }
+
+  INLINE int16_t get() {
     int16_t noise_int15 = (m_state_a >> 17) - 16384;
     return noise_int15;
   }

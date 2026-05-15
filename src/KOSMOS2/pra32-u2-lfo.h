@@ -1,15 +1,16 @@
 #pragma once
 
-#include "pra32-u-common.h"
-#include "pra32-u-lfo-table.h"
-#include "pra32-u-osc-table.h"
+#include "pra32-u2-common.h"
+#include "pra32-u2-lfo-table.h"
+#include "pra32-u2-osc-table.h"
 
-class PRA32_U_LFO {
+class PRA32_U2_LFO {
   static const uint8_t LFO_WAVEFORM_TRIANGLE  = 0;
   static const uint8_t LFO_WAVEFORM_SINE      = 1;
   static const uint8_t LFO_WAVEFORM_SAW_DOWN  = 2;
   static const uint8_t LFO_WAVEFORM_RANDOM    = 3;
   static const uint8_t LFO_WAVEFORM_SQUARE    = 4;
+  static const uint8_t LFO_WAVEFORM_RED_NOISE = 5;
 
   static const uint8_t LFO_FADE_COEF_OFF      = 1;
 
@@ -17,7 +18,6 @@ class PRA32_U_LFO {
 
   uint32_t m_lfo_phase;
   int16_t  m_lfo_wave_level;
-  int16_t  m_lfo_level;
   uint32_t m_lfo_rate;
   uint8_t  m_lfo_depth[2];
   uint8_t  m_lfo_waveform;
@@ -25,13 +25,15 @@ class PRA32_U_LFO {
   uint16_t m_lfo_fade_cnt;
   uint8_t  m_lfo_fade_level;
   int16_t  m_noise_int15;
+  int16_t  m_prev_noise_int15;
   int16_t  m_sampled_noise_int15;
+  uint8_t  m_pressure_amt;
+  uint8_t  m_pressure[4];
 
 public:
-  PRA32_U_LFO()
+  PRA32_U2_LFO()
   : m_lfo_phase()
   , m_lfo_wave_level()
-  , m_lfo_level()
   , m_lfo_rate()
   , m_lfo_depth()
   , m_lfo_waveform()
@@ -39,13 +41,17 @@ public:
   , m_lfo_fade_cnt()
   , m_lfo_fade_level()
   , m_noise_int15()
+  , m_prev_noise_int15()
   , m_sampled_noise_int15()
+  , m_pressure_amt()
+  , m_pressure()
   {
     m_lfo_waveform = LFO_WAVEFORM_TRIANGLE;
     m_lfo_fade_coef = LFO_FADE_COEF_OFF;
     m_lfo_fade_cnt = m_lfo_fade_coef;
     m_lfo_fade_level = LFO_FADE_LEVEL_MAX;
     m_noise_int15 = 0;
+    m_prev_noise_int15 = m_noise_int15;
     m_sampled_noise_int15 = m_noise_int15;
   }
 
@@ -53,44 +59,61 @@ public:
     static uint8_t lfo_waveform_table[6] = {
       LFO_WAVEFORM_TRIANGLE,
       LFO_WAVEFORM_SINE,
-      LFO_WAVEFORM_SAW_DOWN,
+      LFO_WAVEFORM_RED_NOISE,
       LFO_WAVEFORM_SAW_DOWN,
       LFO_WAVEFORM_RANDOM,
       LFO_WAVEFORM_SQUARE,
     };
 
-    volatile int32_t index = ((controller_value * 10) + 127) / 254;
-
-    // index = min(index, 5)
-    index = index - 5;
-    index = (index < 0) * index + 5;
+    int32_t index = ((controller_value * 10) + 127) / 254;
 
     m_lfo_waveform = lfo_waveform_table[index];
-#if 1
-    if (controller_value < 6) {
-      m_lfo_waveform = lfo_waveform_table[controller_value];
-    }
-#endif
   }
 
+  template <uint32_t LFO_RATE_OFFSET = 0>
   INLINE void set_lfo_rate(uint8_t controller_value) {
     m_lfo_rate = g_lfo_rate_table[controller_value];
+    if (m_lfo_rate > 0) {
+      m_lfo_rate += LFO_RATE_OFFSET;
+    }
   }
 
   template <uint8_t N>
   INLINE void set_lfo_depth(uint8_t controller_value) {
-    m_lfo_depth[N] = (controller_value + 1) >> 1;
+    if (controller_value == 127) {
+      controller_value = 128;
+    }
+
+    m_lfo_depth[N] = controller_value;
   }
 
   INLINE void set_lfo_fade_time(uint8_t controller_value) {
     m_lfo_fade_coef = g_lfo_fade_coef_table[controller_value];
   }
 
+  INLINE void set_pressure_amt(uint8_t controller_value) {
+    if (controller_value == 127) {
+      controller_value = 128;
+    }
+
+    m_pressure_amt = controller_value;
+  }
+
+  template <uint8_t N>
+  INLINE void set_pressure(uint8_t pressure) {
+    if (pressure == 127) {
+      pressure = 128;
+    }
+
+    m_pressure[N] = pressure;
+  }
+
   INLINE void trigger_lfo() {
     if (   (m_lfo_waveform == LFO_WAVEFORM_SAW_DOWN)
         || (m_lfo_waveform == LFO_WAVEFORM_RANDOM)
         || (m_lfo_waveform == LFO_WAVEFORM_SQUARE)) {
-      m_lfo_phase = 0x00FFFFFF;
+      m_lfo_phase = 0x00000000;
+      m_sampled_noise_int15 = m_noise_int15;
     }
 
     if (m_lfo_fade_coef > LFO_FADE_COEF_OFF) {
@@ -98,15 +121,25 @@ public:
     }
   }
 
+  template <uint8_t N>
   INLINE int16_t get_output() {
-    return m_lfo_level;
+    int16_t lfo_depth = high_byte((m_lfo_depth[0] << 1) * m_lfo_fade_level) + m_lfo_depth[1]
+                        + ((m_pressure_amt * m_pressure[N]) >> 7);
+    if (lfo_depth > 128) {
+      lfo_depth = 128;
+    }
+
+    int16_t lfo_level = (lfo_depth * m_lfo_wave_level) >> 7;
+
+    return lfo_level;
   }
 
   INLINE void process_at_low_rate(uint8_t count, int16_t noise_int15) {
     static_cast<void>(count);
 
+    m_prev_noise_int15 = m_noise_int15;
     m_noise_int15 = noise_int15;
-    update_lfo_level();
+    update_lfo_wave_level();
   }
 
 private:
@@ -152,12 +185,15 @@ private:
         level = 0;
       }
       break;
+    case LFO_WAVEFORM_RED_NOISE:
+      level = (m_prev_noise_int15 + m_noise_int15) >> 2;
+      break;
     }
 
     return level;
   }
 
-  INLINE void update_lfo_level() {
+  INLINE void update_lfo_wave_level() {
     --m_lfo_fade_cnt;
     if (m_lfo_fade_cnt == 0) {
       m_lfo_fade_cnt = m_lfo_fade_coef;
@@ -169,14 +205,5 @@ private:
     m_lfo_phase += m_lfo_rate;
     m_lfo_phase &= 0x00FFFFFF;
     m_lfo_wave_level = get_lfo_wave_level(m_lfo_phase);
-
-
-    uint8_t lfo_depth = high_byte((m_lfo_depth[0] << 1) * m_lfo_fade_level) + m_lfo_depth[1];
-    if (lfo_depth > 64) {
-      lfo_depth = 64;
-    }
-    lfo_depth <<= 1;
-
-    m_lfo_level = (lfo_depth * m_lfo_wave_level) >> 7;
   }
 };
