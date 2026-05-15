@@ -632,7 +632,7 @@ unsigned long noteOffTimeD = 0;
 // -----------------------------------------------------
 // MIDI CC 受信
 // -----------------------------------------------------
-void handleCC(uint8_t cc, uint8_t val) {
+void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
 
     switch (cc) {
 
@@ -755,12 +755,28 @@ void handleCC(uint8_t cc, uint8_t val) {
             drawProgramInfo();
             break;
 
+            
+            // --- 既存処理ここまで ---
+
+         default:
+             handleGeneralCC(cc, val, ch);
+             break;
+
     }
     // ★ CC を受け取ったら手動モードに入る
     manualMode = true;
     manualModeTimeout = millis() + 20000;  // ★ 20秒間は手動モード扱い
 
     drawCCValue(cc, val);
+}
+
+void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
+    // UI用CCはスキップ
+    if (cc >= 20 && cc <= 32) return;
+
+    uint8_t target = ch % 4;  // 0〜3に収める
+
+    midi_bridge_send_cc(cc, val, target);
 }
 
 void usb_send_note_on(uint8_t note, uint8_t vel, uint8_t ch) {
@@ -1977,7 +1993,11 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
+<<<<<<< Updated upstream
     lcdPrint(106, 135, "v1.0.0", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+=======
+    lcdPrint(106, 135, "v2.0.1", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+>>>>>>> Stashed changes
     delay(10000);
 }
 
@@ -2249,12 +2269,13 @@ void loop() {
         if (idx == 3) {
 
             uint8_t status = msg[0] & 0xF0;
+            uint8_t ch     = msg[0] & 0x0F;
             uint8_t d1 = msg[1];
             uint8_t d2 = msg[2];
 
             // ★ CC（TouchOSC）
             if (status == 0xB0) {
-                handleCC(d1, d2);
+                handleCC(d1, d2, ch);
             }
 
             idx = 0;
