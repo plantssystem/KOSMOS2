@@ -376,7 +376,7 @@ MIT License
 </td>
 <td>
   <b>osamu</b><br>
-  Creator of KOSMOS2 / plantsystem
+  Creator of KOSMOS2 / plantssystem
 </td>
 </tr>
 </table>
