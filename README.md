@@ -8,15 +8,15 @@
 
 ![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200_01.JPG)
 
-![Version](https://img.shields.io/badge/version-v1.0.0-blue)
-![Platform](https://img.shields.io/badge/platform-RP2040-orange)
+![Version](https://img.shields.io/badge/version-v2.0.1-blue)
+![Platform](https://img.shields.io/badge/platform-RP2350-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico と PRA32-U を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -64,20 +64,9 @@ KOSMOS2 は、
 
 ---
 
-## ⚠️ Pico2（RP2350）動作検証について
-
-[![Status: Pico2 PRA32-U2/M Evaluation](https://img.shields.io/badge/status-Pico2%20PRA32--U2%2FM%20testing-orange.svg)](#kosmos2)
-
-現在、**Raspberry Pi Pico2 + PRA32-U2/M** 環境での KOSMOS2 動作を検証中です。  
-I2S 出力・マルチコア DSP・内蔵シンセ（A/B/C/D 各パート）の安定動作を順次確認しながら、  
-Pico2 向け最適化版として整備していきます。
-
----
-
 ## ✅ MIDI CC フル対応（PRA32-U2 Synth Engine）
 
-本バージョンでは、PRA32-U2 シンセエンジンにおける  
-**MIDI CC受信機能をフル対応化**しました。
+PRA32-U2 シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
 
 ***
 
@@ -85,6 +74,16 @@ Pico2 向け最適化版として整備していきます。
 
 外部MIDI機器や TouchOSC 等から送信される **すべてのMIDI CCメッセージ**を受信し、  
 各シンセパートへリアルタイムに反映できるようになりました。
+
+***
+
+### 🎛 エディタ
+## PRA32-U2 エディタ (Fixed Version)
+
+🔗 **PRA32-U2 Editor**  
+https://github.com/risgk/digital-synth-pra32-u2/blob/856ab5a96e59a1d2bd22878beea5193ecd17c381/pra32-u2-editor.html
+
+![PRA32-U2 Editor Screenshot](docs/screenshots/pra32-u2-editor-html.png)
 
 ***
 
@@ -152,14 +151,6 @@ void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
 
 ***
 
-### 💡 仕様ポイント
-
-> ⚠ Programは「初期値」のみであり、実際の音はリアルタイムCCで上書きされます。
-
-***
-
-### 🎹 コンセプト
-
 この実装によりKOSMOS2は：
 
 > **4パート同時制御可能なMIDIマルチシンセ**
@@ -180,7 +171,7 @@ flowchart TD
     %% ============================
     %% Core0（UI + ロジック）
     %% ============================
-    CC --> C0[Core0<br/>Pico<br/>UI / Logic]
+    CC --> C0[Core0<br/>Pico2<br/>UI / Logic]
 
     C0 --> PAT[Pattern Engine<br/>A/B/C/D]
     C0 --> RAND[Randomizer<br/>Scale / Transpose / Silence]
@@ -191,9 +182,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U シンセ）
+    %% Core1（PRA32-U2 シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U Synth]
+    Q --> C1[Core1<br/>PRA32-U2 Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -266,7 +257,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U）
+## 🎼 4パート構成（PRA32-U2）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -342,7 +333,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ---
 
-## 🎛 物理ボタン（Pico）
+## 🎛 物理ボタン（Pico2）
 
 | ボタン | 機能 |
 |--------|------|
@@ -358,10 +349,10 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 
 ## 📦 ハードウェア構成
 
-- Raspberry Pi **Pico**  
+- Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U Synth Engine（Core1）  
+- PRA32-U2 Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 コントローラー
@@ -378,7 +369,17 @@ MIT License
 
 ## 👤 Author
 
-**Sugimoto**
+<table>
+<tr>
+<td width="140">
+  <img src="docs/author.png" width="120" alt="Author Icon">
+</td>
+<td>
+  <b>osamu</b><br>
+  Creator of KOSMOS2 / plantssystem
+</td>
+</tr>
+</table>
 
 ---
 
