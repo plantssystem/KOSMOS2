@@ -1,4 +1,4 @@
-/* KOSMOS2 + PRA32-U2/M (All-in-One:  Waveshare Pico-Audio version) */
+/* KOSMOS2 + PRA32-U2/M (All-in-One: Waveshare Pico-Audio version) */
 #include <Arduino.h>
 #include <SPI.h>
 #include <Adafruit_TinyUSB.h>
