@@ -1,4 +1,4 @@
-/* KOSMOS2 + PRA32-U2/M (All-in-One: Waveshare Pico-Audio version) */
+/* KOSMOS2 + PRA32-U2/M (All-in-One:  Waveshare Pico-Audio version) */
 #include <Arduino.h>
 #include <SPI.h>
 #include <Adafruit_TinyUSB.h>
@@ -758,7 +758,38 @@ void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
             programC = random(0, 17);
             programD = random(0, 17);
 
-            needRandomExec = true;  // ★ ここ変更
+            // ---- A ----
+            if (programA == 16) {
+                muteA = true;
+            } else {
+                muteA = false;
+                midi_bridge_send_cc(120, programA, 0);
+            }
+
+            // ---- B ----
+            if (programB == 16) {
+                muteB = true;
+            } else {
+                muteB = false;
+                midi_bridge_send_cc(120, programB, 1);
+            }
+
+            // ---- C ----
+            if (programC == 16) {
+                muteC = true;
+            } else {
+                muteC = false;
+                midi_bridge_send_cc(120, programC, 2);
+            }
+
+            // ---- D ----
+            if (programD == 16) {
+                muteD = true;
+            } else {
+                muteD = false;
+                midi_bridge_send_cc(120, programD, 3);
+            }
+
             uiNeedUpdate = true;
             break;
 
