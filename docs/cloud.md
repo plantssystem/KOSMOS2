@@ -377,7 +377,7 @@ KOSMOS2 の “人格” を作る部分はすべて Core0 に集約。
 ---
 
 ## 2. **Core1 = シンセエンジン**
-PRA32-U2 の音源部分は Core1 に固定。
+PRA32-U2/M の音源部分は Core1 に固定。
 
 - Oscillator  
 - Filter  
