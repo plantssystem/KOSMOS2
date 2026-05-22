@@ -358,6 +358,7 @@ flowchart TB
     SCHED --> QUEUE
     QUEUE --> SYNTH
     SYNTH --> AUDIO
+```
 
 ---
 
