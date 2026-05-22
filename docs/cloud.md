@@ -261,7 +261,7 @@ void cloud_polling_task() {
 
 ---
 
-## 🧠 ポイント解説
+## 🧠 解説
 
 ### 1. **absolute_time_t を使った正確な周期処理**
 RP2350 のタイマーは安定しているので、  
@@ -316,7 +316,7 @@ if (strcmp(last_updated, new_updated) != 0) {
 
 ---
 
-# 🔥 KOSMOS2 らしい “進化ポーリング” も可能
+# 🔥 KOSMOS2 らしい “進化ポーリング” 
 
 クラウド側でランダム生成 API を作っておけば：
 
