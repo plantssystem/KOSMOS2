@@ -997,12 +997,12 @@ void readButtons() {
                 midi_bridge_send_cc(120, programD, 3);
             }
 
-            drawProgramInfo();
+            uiNeedUpdate = true;
         }
     }
 
     // ============================================================
-    // ★ Y ボタン（全パート音色リセット専用）
+    // ★ Y ボタン（ランダムミュート専用）
     // ============================================================
 
     if (nowY && !lastY) {
@@ -1013,18 +1013,13 @@ void readButtons() {
         unsigned long dur = millis() - pressStartY;
         if (dur < 300) {
 
-            // ★ Y 単独押しで全パート音色リセット（JOY_SW 無視）
-            programA = 1;
-            programB = 6;
-            programC = 14;
-            programD = 7;
+            // ★ Y 単独押し → ランダムミュートのみ
+            muteA = (random(0,2) == 0);
+            muteB = (random(0,2) == 0);
+            muteC = (random(0,2) == 0);
+            muteD = (random(0,2) == 0);
 
-            midi_bridge_send_cc(120, programA, 0);
-            midi_bridge_send_cc(120, programB, 1);
-            midi_bridge_send_cc(120, programC, 2);
-            midi_bridge_send_cc(120, programD, 3);
-
-            drawProgramInfo();
+            uiNeedUpdate = true;
         }
     }
 
@@ -2052,7 +2047,7 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
-    lcdPrint(106, 135, "v2.0.2", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+    lcdPrint(106, 135, "v2.0.4", COLOR_DARK_GRAY, COLOR_BLACK, 1);
     delay(10000);
 }
 
