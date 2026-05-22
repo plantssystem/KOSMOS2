@@ -330,11 +330,6 @@ GET /random
 
 ---
 
-
-↑ このように **バッククォート3つ → mermaid → 図 → バッククォート3つ**。
-
----
-
 ## 🎛️ KOSMOS2 Dual‑Core Architecture
 
 ```mermaid
