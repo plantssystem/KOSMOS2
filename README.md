@@ -32,7 +32,47 @@ KOSMOS2 は、
 **“自律生成” と “手動操作” を自然に融合させたライブ楽器**です。
 
 ---
+## 🌩️ Cloud Features
 
+KOSMOS2 は Wi‑Fi 経由でクラウドプリセットを取得し、  
+リアルタイムで生成エンジンに反映できます。
+
+👉 詳細仕様はこちら  
+**[Cloud Preset & Cloud API Documentation](docs/cloud.md)**
+
+## 🟢 **1. Cloud Preset / Cloud API のステータス**
+### **Cloud Preset 対応済み**
+![Cloud Preset](https://img.shields.io/badge/Cloud_Preset-Enabled-brightgreen)
+### **Cloud API v1.0**
+![Cloud API](https://img.shields.io/badge/Cloud_API-v1.0-blue)
+### **Polling（クラウド監視）有効**
+![Polling](https://img.shields.io/badge/Cloud_Polling-Active-blueviolet)
+
+---
+
+## ⚙️ **2. Dual‑Core Architecture ステータス**
+### **Core0: Generative Engine**
+![Core0](https://img.shields.io/badge/Core0-Generative_Engine-orange)
+### **Core1: Synth Engine (PRA32‑U2/M)**
+![Core1](https://img.shields.io/badge/Core1-Synth_Engine_(PRA32--U2/M)-yellow)
+
+---
+
+## 📡 **3. Wi‑Fi / Network ステータス**
+### **Wi‑Fi 対応（Pico 2 W）**
+![WiFi](https://img.shields.io/badge/WiFi-Pico2_W_Supported-0aa)
+### **HTTP GET 実装済み**
+![HTTP GET](https://img.shields.io/badge/HTTP_GET-Implemented-0af)
+
+---
+
+## 🎹 **4. MIDI / Synth ステータス**
+### **USB MIDI OUT**
+![USB MIDI](https://img.shields.io/badge/USB_MIDI-Enabled-ff69b4)
+### **Generative Engine v2**
+![Generative Engine](https://img.shields.io/badge/Generative_Engine-v2.0-lightgrey)
+
+---
 ## 🎬 デモ・ビデオ
 
 <table>
