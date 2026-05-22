@@ -316,7 +316,7 @@ if (strcmp(last_updated, new_updated) != 0) {
 
 ---
 
-# 🔥 KOSMOS2 らしい “進化ポーリング” 
+# 🔥 KOSMOS2 “進化ポーリング” 
 
 クラウド側でランダム生成 API を作っておけば：
 
