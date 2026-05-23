@@ -8,7 +8,7 @@
 
 ![KOSMOS Screenshot](docs/screenshots/KOSMOS2v200_01.JPG)
 
-![Version](https://img.shields.io/badge/version-v2.0.3-blue)
+![Version](https://img.shields.io/badge/version-v2.0.4-blue)
 ![Platform](https://img.shields.io/badge/platform-RP2350-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -425,7 +425,7 @@ MIT License
 
 ## Special Thanks
 - MATRIXSYNTH
-- Powerd by ISGK Instruments PRA32-U2
+- Powerd by ISGK Instruments PRA32-U2/M
 - https://github.com/risgk/digital-synth-pra32-u2
 
 ***
