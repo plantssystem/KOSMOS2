@@ -10,13 +10,14 @@
 
 ![Version](https://img.shields.io/badge/version-v2.0.4-blue)
 ![Platform](https://img.shields.io/badge/platform-RP2350-orange)
+![SynthEngine](https://img.shields.io/badge/SynthEngine-PRA32--U2%2FM-purple)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 ---
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2/M を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -64,9 +65,9 @@ KOSMOS2 は、
 
 ---
 
-## ✅ MIDI CC フル対応（PRA32-U2 Synth Engine）
+## ✅ MIDI CC フル対応（PRA32-U2/M Synth Engine）
 
-PRA32-U2 シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
+PRA32-U2/M シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
 
 ***
 
@@ -182,9 +183,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U2 シンセ）
+    %% Core1（PRA32-U2/M シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U2 Synth]
+    Q --> C1[Core1<br/>PRA32-U2/M Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -257,7 +258,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U2）
+## 🎼 4パート構成（PRA32-U2/M）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -339,9 +340,10 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 |--------|------|
 | **A** | A パート音色変更 |
 | **B** | B パート音色変更 |
-| **X** | 4パート音色ガチャ（CC30） |
-| **Y** | 4パート音色リセット（CC31） |
+| **X** | C パート音色変更 |
+| **Y** | D パート音色変更 |
 | **A+B** | MIDI Start / Stop |
+| **X+Y** | Volume X:Up / Y:Down |
 
 ※ **ジョイスティックは使用していません**
 
@@ -352,7 +354,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 - Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U2 Synth Engine（Core1）  
+- PRA32-U2/M Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 コントローラー
@@ -385,7 +387,7 @@ MIT License
 
 ## Special Thanks
 - MATRIXSYNTH
-- Powerd by ISGK Instruments PRA32-U2
+- Powerd by ISGK Instruments PRA32-U2/M
 - https://github.com/risgk/digital-synth-pra32-u2
 
 ***
