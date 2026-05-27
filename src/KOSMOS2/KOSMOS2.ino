@@ -616,6 +616,8 @@ unsigned long lastStepX = 0;
 
 bool isPlaying = false;
 
+bool volumeMode = false;
+
 // ---- グローバルに置く----
 int degreeA = 0;   // スケール内の現在位置
 int dirA    = 1;   // 上昇(+1) / 下降(-1)
@@ -889,145 +891,169 @@ void readButtons() {
     bool nowY = (digitalRead(KEY_Y_PIN) == LOW);
 
     // ============================================================
-    // ★ A ボタン（A パートのみ）
+    // ★ X + Y 同時押し → 音量調整モード ON/OFF
     // ============================================================
+    if (nowX && nowY && (!lastX || !lastY)) {
+        volumeMode = !volumeMode;   // トグル
+        uiNeedUpdate = true;
+    }
 
+    // ============================================================
+    // ★ 音量調整モード中は X=UP / Y=DOWN にする
+    // ============================================================
+    if (volumeMode) {
+
+        // X → 音量アップ
+        if (nowX && !nowY) {
+            ccVolume = constrain(ccVolume + 2, 0, 127);
+            masterVolume = (float)ccVolume / 127.0f;
+            midi_bridge_send_cc(7, ccVolume, 0);
+            uiNeedUpdate = true;
+        }
+
+        // Y → 音量ダウン
+        if (nowY && !nowX) {
+            ccVolume = constrain(ccVolume - 2, 0, 127);
+            masterVolume = (float)ccVolume / 127.0f;
+            midi_bridge_send_cc(7, ccVolume, 0);
+            uiNeedUpdate = true;
+        }
+
+        // 音量モード中は他のボタン処理を無効化
+        lastAState = nowA;
+        lastBState = nowB;
+        lastX = nowX;
+        lastY = nowY;
+        return;
+    }
+
+    // ============================================================
+    // ★ A ボタン → A パート音色変更（ch0）
+    // ============================================================
+    // ============================================================
+    // ★ A ボタン長押し → A パートミュート切り替え
+    // ============================================================
     if (nowA && !lastAState) {
         pressStartA = millis();
     }
-
     if (!nowA && lastAState) {
         unsigned long dur = millis() - pressStartA;
-        if (dur < 300) {
 
-            // ★ A パート音色変更のみ
+        if (dur >= 300) {
+            // ★ 長押し → ミュート切り替え
+            muteA = !muteA;
+            uiNeedUpdate = true;
+        }
+        else {
+            // ★ 短押し → 音色変更（既存処理）
             programA = (programA + 1) % 16;
-            midi_bridge_send_cc(120, programA, 0);  // ch0 = A パート
-            drawProgramInfo();
+            midi_bridge_send_cc(120, programA, 0);
+            uiNeedUpdate = true;
         }
     }
 
     // ============================================================
-    // ★ B ボタン（B パートのみ）
+    // ★ B ボタン → B パート音色変更（ch1）
     // ============================================================
-
     if (nowB && !lastBState) {
         pressStartB = millis();
     }
-
     if (!nowB && lastBState) {
         unsigned long dur = millis() - pressStartB;
-        if (dur < 300) {
 
-            // ★ B パート音色変更のみ
+        if (dur >= 300) {
+            muteB = !muteB;
+            uiNeedUpdate = true;
+        }
+        else {
             programB = (programB + 1) % 16;
-            midi_bridge_send_cc(120, programB, 1);  // ch1 = B パート
-            drawProgramInfo();
+            midi_bridge_send_cc(120, programB, 1);
+            uiNeedUpdate = true;
         }
     }
 
     // ============================================================
-    // ★ A + B 同時押し → MIDI Start / Stop
+    // ★ X ボタン → C パート音色変更（ch2）
     // ============================================================
-
-    if (nowA && nowB && (!lastAState || !lastBState)) {
-
-        if (!isPlaying) {
-            // ★ 再生開始
-            usb_midi.write(0xFA);   // MIDI Start
-            isPlaying = true;
-            bpmColor = COLOR_WHITE;   // ★ Start → 白
-            drawTopText();
-        } else {
-            // ★ 停止
-            usb_midi.write(0xFC);   // MIDI Stop
-            isPlaying = false;
-            bpmColor = COLOR_RED;   // ★ End → 赤
-            drawTopText();
-        }
-    }
-
-    // ============================================================
-    // ★ X ボタン（全パート音色ガチャ：ミュートあり）
-    // ============================================================
-
     if (nowX && !lastX) {
         pressStartX = millis();
     }
-
     if (!nowX && lastX) {
         unsigned long dur = millis() - pressStartX;
-        if (dur < 300) {
 
-            // ★ X 単独押しで全パート音色ガチャ（ミュートあり）
-            programA = random(0, 17);   // 0〜15 = 音色, 16 = ミュート
-            programB = random(0, 17);
-            programC = random(0, 17);
-            programD = random(0, 17);
-
-            // ---- A パート ----
-            if (programA == 16) {
-                muteA = true;
-            } else {
-                muteA = false;
-                midi_bridge_send_cc(120, programA, 0);
-            }
-
-            // ---- B パート ----
-            if (programB == 16) {
-                muteB = true;
-            } else {
-                muteB = false;
-                midi_bridge_send_cc(120, programB, 1);
-            }
-
-            // ---- C パート ----
-            if (programC == 16) {
-                muteC = true;
-            } else {
-                muteC = false;
-                midi_bridge_send_cc(120, programC, 2);
-            }
-
-            // ---- D パート ----
-            if (programD == 16) {
-                muteD = true;
-            } else {
-                muteD = false;
-                midi_bridge_send_cc(120, programD, 3);
-            }
-
+        if (dur >= 300) {
+            muteC = !muteC;
+            uiNeedUpdate = true;
+        }
+        else {
+            programC = (programC + 1) % 16;
+            midi_bridge_send_cc(120, programC, 2);
             uiNeedUpdate = true;
         }
     }
 
     // ============================================================
-    // ★ Y ボタン（ランダムミュート専用）
+    // ★ Y ボタン → D パート音色変更（ch3）
     // ============================================================
-
     if (nowY && !lastY) {
         pressStartY = millis();
     }
-
     if (!nowY && lastY) {
         unsigned long dur = millis() - pressStartY;
-        if (dur < 300) {
 
-            // ★ Y 単独押し → ランダムミュートのみ
-            muteA = (random(0,2) == 0);
-            muteB = (random(0,2) == 0);
-            muteC = (random(0,2) == 0);
-            muteD = (random(0,2) == 0);
-
+        if (dur >= 300) {
+            muteD = !muteD;
+            uiNeedUpdate = true;
+        }
+        else {
+            programD = (programD + 1) % 16;
+            midi_bridge_send_cc(120, programD, 3);
             uiNeedUpdate = true;
         }
     }
 
     // ============================================================
+    // ★ A + B 同時押し → Start / Stop
+    // ============================================================
+    if (nowA && nowB && (!lastAState || !lastBState)) {
+        if (!isPlaying) {
+            usb_midi.write(0xFA);   // Start
+            isPlaying = true;
+            bpmColor = COLOR_WHITE;
+            drawTopText();
+        } else {
+            usb_midi.write(0xFC);   // Stop
+            isPlaying = false;
+            bpmColor = COLOR_RED;
+            drawTopText();
+        }
+    }
+
     lastAState = nowA;
     lastBState = nowB;
     lastX = nowX;
     lastY = nowY;
+}
+
+void drawVolumeBar() {
+    if (!volumeMode) return;
+
+    // バーの位置とサイズ
+    const int barX = 220;   // 右端寄り
+    const int barY = 140;   // 上端（縦バーの開始位置）
+    const int barW = 10;    // バーの幅
+    const int barH = 90;    // バー全体の高さ
+
+    // 背景クリア
+    lcdFillRect(barX, barY, barW, barH, COLOR_BLACK);
+
+    // 音量に応じた高さ
+    int filled = map(ccVolume, 0, 127, 0, barH);
+
+    // 下から上に伸びる縦バー
+    int drawY = barY + (barH - filled);
+
+    lcdFillRect(barX, drawY, barW, filled, COLOR_WHITE);
 }
 
 void drawPlayIndicator(uint16_t color) {
@@ -1047,6 +1073,7 @@ void drawScaleName() {
     lcdPrint(5, 22, name, COLOR_WHITE, COLOR_BLACK, 1);
 }
 
+/*
 void drawProgramInfo() {
     // 表示エリアをクリア（座標はあなたのUIに合わせて調整）
     lcdFillRect(0, 35, 240, 20, COLOR_BLACK);
@@ -1072,6 +1099,67 @@ void drawProgramInfo() {
     if (muteD) sprintf(buf, "D:--");
     else       sprintf(buf, "D:%02d", programD);
     lcdPrint(185, 40, buf, COLOR_WHITE, COLOR_BLACK, 1);
+}
+*/
+
+void drawProgramInfo() {
+    static int lastA = -1;
+    static int lastB = -1;
+    static int lastC = -1;
+    static int lastD = -1;
+
+    static bool lastMuteA = false;
+    static bool lastMuteB = false;
+    static bool lastMuteC = false;
+    static bool lastMuteD = false;
+
+    // ★ 値が変わっていなければ描画しない（点滅防止）
+    if (programA == lastA &&
+        programB == lastB &&
+        programC == lastC &&
+        programD == lastD &&
+        muteA == lastMuteA &&
+        muteB == lastMuteB &&
+        muteC == lastMuteC &&
+        muteD == lastMuteD) {
+        return;
+    }
+
+    // ★ 表示エリアをクリア（あなたの指定どおり）
+    lcdFillRect(0, 35, 240, 20, COLOR_BLACK);
+
+    char buf[16];
+
+    // ---- A パート ----
+    if (muteA) sprintf(buf, "A:--");
+    else       sprintf(buf, "A:%02d", programA);
+    lcdPrint(5, 40, buf, COLOR_WHITE, COLOR_BLACK, 1);
+
+    // ---- B パート ----
+    if (muteB) sprintf(buf, "B:--");
+    else       sprintf(buf, "B:%02d", programB);
+    lcdPrint(65, 40, buf, COLOR_WHITE, COLOR_BLACK, 1);
+
+    // ---- C パート ----
+    if (muteC) sprintf(buf, "C:--");
+    else       sprintf(buf, "C:%02d", programC);
+    lcdPrint(125, 40, buf, COLOR_WHITE, COLOR_BLACK, 1);
+
+    // ---- D パート ----
+    if (muteD) sprintf(buf, "D:--");
+    else       sprintf(buf, "D:%02d", programD);
+    lcdPrint(185, 40, buf, COLOR_WHITE, COLOR_BLACK, 1);
+
+    // ★ 前回値を更新
+    lastA = programA;
+    lastB = programB;
+    lastC = programC;
+    lastD = programD;
+
+    lastMuteA = muteA;
+    lastMuteB = muteB;
+    lastMuteC = muteC;
+    lastMuteD = muteD;
 }
 
 // 中心値
@@ -1287,6 +1375,7 @@ void drawUI() {
     updateStepDots();
     drawRandomMode();
     drawProgramInfo();
+    drawVolumeBar();
 }
 
 void drawOneProbabilityBar(int i) {
@@ -2047,7 +2136,7 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
-    lcdPrint(106, 135, "v2.0.4", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+    lcdPrint(106, 135, "v2.0.5", COLOR_DARK_GRAY, COLOR_BLACK, 1);
     delay(10000);
 }
 
