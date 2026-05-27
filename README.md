@@ -16,7 +16,7 @@
 
 ## 🚀 概要
 
-**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2/M を中心に構築された  
+**KOSMOS2** は、Raspberry Pi Pico2 と PRA32-U2 を中心に構築された  
 **4パート構成のジェネレーティブ音響エンジン**です。
 
 - 4つの独立したシンセパート（A/B/C/D）  
@@ -32,47 +32,7 @@ KOSMOS2 は、
 **“自律生成” と “手動操作” を自然に融合させたライブ楽器**です。
 
 ---
-## 🌩️ Cloud Features
 
-KOSMOS2 は Wi‑Fi 経由でクラウドプリセットを取得し、  
-リアルタイムで生成エンジンに反映できます。
-
-👉 詳細仕様はこちら  
-**[Cloud Preset & Cloud API Documentation](docs/cloud.md)**
-
-## 🟢 **1. Cloud Preset / Cloud API のステータス**
-### **Cloud Preset 対応済み**
-![Cloud Preset](https://img.shields.io/badge/Cloud_Preset-Enabled-brightgreen)
-### **Cloud API v1.0**
-![Cloud API](https://img.shields.io/badge/Cloud_API-v1.0-blue)
-### **Polling（クラウド監視）有効**
-![Polling](https://img.shields.io/badge/Cloud_Polling-Active-blueviolet)
-
----
-
-## ⚙️ **2. Dual‑Core Architecture ステータス**
-### **Core0: Generative Engine**
-![Core0](https://img.shields.io/badge/Core0-Generative_Engine-orange)
-### **Core1: Synth Engine (PRA32‑U2/M)**
-![Core1](https://img.shields.io/badge/Core1-Synth_Engine_(PRA32--U2/M)-yellow)
-
----
-
-## 📡 **3. Wi‑Fi / Network ステータス**
-### **Wi‑Fi 対応（Pico 2 W）**
-![WiFi](https://img.shields.io/badge/WiFi-Pico2_W_Supported-0aa)
-### **HTTP GET 実装済み**
-![HTTP GET](https://img.shields.io/badge/HTTP_GET-Implemented-0af)
-
----
-
-## 🎹 **4. MIDI / Synth ステータス**
-### **USB MIDI OUT**
-![USB MIDI](https://img.shields.io/badge/USB_MIDI-Enabled-ff69b4)
-### **Generative Engine v2**
-![Generative Engine](https://img.shields.io/badge/Generative_Engine-v2.0-lightgrey)
-
----
 ## 🎬 デモ・ビデオ
 
 <table>
@@ -104,9 +64,9 @@ KOSMOS2 は Wi‑Fi 経由でクラウドプリセットを取得し、
 
 ---
 
-## ✅ MIDI CC フル対応（PRA32-U2/M Synth Engine）
+## ✅ MIDI CC フル対応（PRA32-U2 Synth Engine）
 
-PRA32-U2/M シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
+PRA32-U2 シンセエンジンにおける**MIDI CC受信機能をフル対応化**しました。
 
 ***
 
@@ -222,9 +182,9 @@ flowchart TD
     C0 --> Q[MIDI Event Queue]
 
     %% ============================
-    %% Core1（PRA32-U2/M シンセ）
+    %% Core1（PRA32-U2 シンセ）
     %% ============================
-    Q --> C1[Core1<br/>PRA32-U2/M Synth]
+    Q --> C1[Core1<br/>PRA32-U2 Synth]
 
     C1 --> A[A Part<br/>Main]
     C1 --> B[B Part<br/>Sub Bass]
@@ -297,7 +257,7 @@ A/B/C/D すべてのノートをリアルタイムに描画。
 
 ---
 
-## 🎼 4パート構成（PRA32-U2/M）
+## 🎼 4パート構成（PRA32-U2）
 
 | パート | 役割 | 説明 |
 |--------|------|------|
@@ -392,7 +352,7 @@ A パートを一時的に沈黙させ、再開時にパターン再生成。
 - Raspberry Pi **Pico2**  
 - Waveshare Pico-Audio  
 - Waveshare Pico-LCD 1.3"  
-- PRA32-U2/M Synth Engine（Core1）  
+- PRA32-U2 Synth Engine（Core1）  
 - TouchOSC（iOS/Android）
 
 ## KOSMOS2 コントローラー
@@ -425,7 +385,7 @@ MIT License
 
 ## Special Thanks
 - MATRIXSYNTH
-- Powerd by ISGK Instruments PRA32-U2/M
+- Powerd by ISGK Instruments PRA32-U2
 - https://github.com/risgk/digital-synth-pra32-u2
 
 ***
