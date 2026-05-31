@@ -78,10 +78,10 @@ uint8_t g_midi_ch = PRA32_U2_MIDI_CH;
 // C = ch2
 // D = ch3
 
-PRA32_U2_Synth<true, false, true, 0> g_synth;
-PRA32_U2_Synth<true, false, true, 1> g_sub_synth;
-PRA32_U2_Synth<true, false, true, 2> g_chord;
-PRA32_U2_Synth<true, false, true, 3> g_seq;
+PRA32_U2_Synth<true,  false, true, 0> g_synth;
+PRA32_U2_Synth<true,  false, true, 1> g_sub_synth;
+PRA32_U2_Synth<true,  false, true, 2> g_chord;
+PRA32_U2_Synth<true,  false, true, 3> g_seq;
 
 float masterVolume = 1.0f;
 
@@ -140,10 +140,10 @@ void processMidiOnCore1() {
 #include "pico/multicore.h"
 
 // ---- 音色番号----
-int programA = 1;      // ch1 初期音色
+int programA = 6;      // ch1 初期音色
 int programB = 6;      // ch2 初期音色
-int programC = 14;     // ch3 初期音色
-int programD = 7;      // ch4 初期音色
+int programC = 6;     // ch3 初期音色
+int programD = 6;      // ch4 初期音色
 
 void updateMidiClock_Core1() {
     static uint32_t lastClockMicros = 0;
@@ -214,7 +214,7 @@ void __not_in_flash_func(core1_main)() {
         
         // ---- MIDI クロック送信 ----
         updateMidiClock_Core1();
-        
+
         // ---- MIDI 受信 ----
         processMidiOnCore1();
 
@@ -657,6 +657,8 @@ uint32_t lastCCTime = 0;
 uint8_t lastCC = 0;
 uint8_t lastCCVal = 0;
 
+bool midiSyncMode = false;
+
 // =====================================================
 // KOSMOS2 MIDI CC Receiver
 // TouchOSC Controller 対応
@@ -856,19 +858,31 @@ inline void midi_bridge_send_note_off(uint8_t note, uint8_t ch=0){
 }
 
 void resetAllParts() {
-    programA = 0;
-    programA = 1;
-    programB = 6;
-    programC = 14;
-    programD = 7;
 
-    // ★ ミュートも全解除
+    // ★ 初回起動だけ 6 番にする
+    if (!startupArpDone) {
+        programA = 6;
+        programB = 6;
+        programC = 6;
+        programD = 6;
+
+        startupArpDone = true;  // ★ 次回以降は通常の初期値へ
+    }
+    else {
+        // ★ 2回目以降は従来の初期値
+        programA = 1;
+        programB = 6;
+        programC = 14;
+        programD = 7;
+    }
+
+    // ★ ミュート解除
     muteA = false;
     muteB = false;
     muteC = false;
     muteD = false;
 
-    // ★ 音色を Core1 に再送信して同期
+    // ★ Core1 に音色を送信
     midi_bridge_send_cc(120, programA, 0);
     midi_bridge_send_cc(120, programB, 1);
     midi_bridge_send_cc(120, programC, 2);
@@ -889,6 +903,14 @@ void readButtons() {
     bool nowB = (digitalRead(KEY_B_PIN) == LOW);
     bool nowX = (digitalRead(KEY_X_PIN) == LOW);
     bool nowY = (digitalRead(KEY_Y_PIN) == LOW);
+
+    // =====================================================
+    // ★ A + B 同時押し → MIDISYNC モード切替
+    // =====================================================
+    if (nowA && nowB && (!lastAState || !lastBState)) {
+        midiSyncMode = !midiSyncMode;  //トグル
+        uiNeedUpdate = true;
+    }
 
     // ============================================================
     // ★ X + Y 同時押し → 音量調整モード ON/OFF
@@ -1813,15 +1835,32 @@ void drawTopText() {
     static int lastBPM = -1;
     static uint16_t lastColor = 0xFFFF;
 
-    if (stepBPM != lastBPM || bpmColor != lastColor) {
+    // MIDISYNC モード中だけ BPM を赤で表示
+    if (midiSyncMode) {
+
+        uint16_t bpmColor = COLOR_RED;
+
+        // 差分があれば描画
+        if (stepBPM != lastBPM || bpmColor != lastColor) {
+
+            // 表示領域クリア
+            lcdFillRect(130, 20, 60, 20, COLOR_BLACK);
+
+            char buf[16];
+            sprintf(buf, "BPM:%d", stepBPM);
+            lcdPrint(130, 25, buf, bpmColor, COLOR_BLACK, 1);
+
+            lastBPM = stepBPM;
+            lastColor = bpmColor;
+        }
+    }
+    else {
+        // MIDISYNC OFF → BPM 表示を完全に消す
         lcdFillRect(130, 20, 60, 20, COLOR_BLACK);
 
-        char buf[16];
-        sprintf(buf, "BPM:%d", stepBPM);
-        lcdPrint(130, 25, buf, bpmColor, COLOR_BLACK, 1);
-
-        lastBPM = stepBPM;
-        lastColor = bpmColor;
+        // last 値をリセットしておく（次回表示のため）
+        lastBPM = -1;
+        lastColor = 0xFFFF;
     }
 }
 
@@ -2136,7 +2175,7 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
-    lcdPrint(106, 135, "v2.0.5", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+    lcdPrint(106, 135, "v2.0.6", COLOR_DARK_GRAY, COLOR_BLACK, 1);
     delay(10000);
 }
 
@@ -2148,6 +2187,9 @@ void playStartupArp() {
         midi_bridge_send_note_off(notes[i], 0);
     }
 }
+
+// Android USB MIDI 最適化用タイマー
+uint32_t lastUsbKeepAlive = 0;
 
 void setup() {
   Serial.begin(115200);
@@ -2202,7 +2244,7 @@ void setup() {
   lastX = (digitalRead(KEY_X_PIN) == LOW);
 
   Serial.println("Core0: setup done, Core1 launched");
-  
+
   masterVolume = 0.5f;
   midi_bridge_send_cc(7, 64, 0);
 }
@@ -2373,6 +2415,23 @@ uint32_t getClockIntervalMicros() {
 
 void loop() {
 
+    tud_task();              // USB処理
+    usb_midi.flush();        // MIDI送信バッファを流す
+
+    // -----------------------------------------------------
+    // ★ Android 向け KeepAlive パケット（100msごと）
+    // -----------------------------------------------------
+    uint32_t now = millis();
+    if (now - lastUsbKeepAlive >= 100) {
+        lastUsbKeepAlive = now;
+
+        // ダミーの MIDI パケット（NoteOff 0）
+        uint8_t dummy[3] = {0x80, 0x00, 0x00};
+        usb_midi.write(dummy, 3);
+
+        usb_midi.flush();  // ★ Android では flush が重要
+    }
+
     // manualMode 中はサイレンスを強制解除
     if (manualMode) {
         mainSilenceActive = false;
@@ -2426,7 +2485,8 @@ void loop() {
     if (now_us - lastFrame < 300) return;
     lastFrame = now_us;
 
-    uint32_t now = millis();
+    // 2回目は再宣言せず、代入だけにする
+    now = millis();
 
     if (interval < 10) interval = 10;
 
@@ -2921,4 +2981,9 @@ void loop() {
         lastUiUpdateMs = millis();
         uiNeedUpdate = false;
     }
+    
+    // -----------------------------------------------------
+    // ★ ループ末尾でも flush（Android 安定化）
+    // -----------------------------------------------------
+    usb_midi.flush();
 }
