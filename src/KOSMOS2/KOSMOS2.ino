@@ -1,5 +1,9 @@
-/* KOSMOS2 + PRA32-U2/M (All-in-One:  Waveshare Pico-Audio version) */
+/* KOSMOS2 + PRA32-U2/M (All-in-One: Waveshare Pico-Audio version) */
 #include <Arduino.h>
+#include <SPI.h>
+#include <Adafruit_TinyUSB.h>
+
+Adafruit_USBD_MIDI usb_midi;
 
 // Optional: give Core1 8KB stack if needed
 bool core1_separate_stack = false;
@@ -60,10 +64,7 @@ inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
 
 inline void midi_bridge_send_cc(uint8_t cc,uint8_t val,uint8_t ch=0){
     MidiEvent ev{EV_CC,cc,val,ch};
-    for (int i = 0; i < 50; i++) {   // CC は優先度低めでリトライ回数も少なく
-        if (MidiQ::push(ev)) return;
-        tight_loop_contents();
-    }
+    MidiQ::push(ev);  // ★ 失敗しても気にしない
 }
 
 // PRA32-U synth 用のグローバル
@@ -144,6 +145,18 @@ int programB = 6;      // ch2 初期音色
 int programC = 14;     // ch3 初期音色
 int programD = 7;      // ch4 初期音色
 
+void updateMidiClock_Core1() {
+    static uint32_t lastClockMicros = 0;
+
+    uint32_t interval = getClockIntervalMicros();  // ← Core0 の関数を呼ぶ
+
+    uint32_t now = micros();
+    if (now - lastClockMicros >= interval) {
+        lastClockMicros += interval;
+        usb_midi.write(0xF8);  // ← Core1 で送信
+    }
+}
+
 // ------------------------------------------------------
 // Core1: メイン処理（I2S + シンセ + MIDI受信）
 // ------------------------------------------------------
@@ -198,7 +211,10 @@ void __not_in_flash_func(core1_main)() {
     const float gainD = 0.5f;
 
     while (true) {
-
+        
+        // ---- MIDI クロック送信 ----
+        updateMidiClock_Core1();
+        
         // ---- MIDI 受信 ----
         processMidiOnCore1();
 
@@ -254,12 +270,6 @@ void __not_in_flash_func(core1_main)() {
 }
 
 // ----------------------- Core0: KOSMOS2 (patched) -----------------------
-#include <Arduino.h>
-#include <SPI.h>
-#include <Adafruit_TinyUSB.h>
-
-Adafruit_USBD_MIDI usb_midi;
-
 // ==== RGB565 カラー定義 ====
 #define COLOR_BLACK   0x0000
 #define COLOR_WHITE   0xFFFF
@@ -629,6 +639,22 @@ int dDensity = 100;
 bool dGoingUp = true;
 int dPhraseRemain = 0;   // モチーフの残りステップ
 
+// ==============================
+// ★ 非同期処理フラグ
+// ==============================
+volatile bool uiNeedUpdate = false;
+volatile bool needRandomExec = false;
+
+// UIレート制御
+uint32_t lastUiUpdateMs = 0;
+
+// CCスロットリング
+uint32_t lastCCTime = 0;
+
+// UI表示用
+uint8_t lastCC = 0;
+uint8_t lastCCVal = 0;
+
 // =====================================================
 // KOSMOS2 MIDI CC Receiver
 // TouchOSC Controller 対応
@@ -688,141 +714,78 @@ unsigned long noteOffTimeD = 0;
 // -----------------------------------------------------
 void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
 
+    // ★ CCスロットリング（100Hz制限）
+    if (millis() - lastCCTime < 10) return;
+    lastCCTime = millis();
+
+    lastCC = cc;
+    lastCCVal = val;
+
     switch (cc) {
 
-        // ---------------------------------------------
-        // Density（発音率） CC20
-        // ---------------------------------------------
         case 20:
             ccDensity = val;
-            // mainDensity に直接反映（0〜100%）
             mainDensity = map(val, 0, 127, 0, 100);
             break;
 
-        // ---------------------------------------------
-        // Pitch（音程オフセット） CC21
-        // ---------------------------------------------
         case 21:
             ccPitch = val;
             pitchOffset = map(val, 0, 127, -24, +24);
             break;
 
-        // ---------------------------------------------
-        // Speed（テンポ倍率） CC22
-        // ---------------------------------------------
         case 22:
             ccSpeed = val;
             speedMul = map(val, 0, 127, 50, 200) / 100.0f;
-
-            // ★ テンポ変更時にステップを即リセット
-            g_arp.nextStepMs = millis();      // Passage Engine
             break;
 
-        // ---------------------------------------------
-        // Scale（スケール切替） CC23
-        // ---------------------------------------------
         case 23:
             ccScale = val;
-
-            // KOSMOS2 の内部自動スケール切替を無効化
             pendingScale = -1;
-
-            // TouchOSC の値をそのまま採用
             scaleMode = val % 3;
 
-            // スケール変更時はパターン再生成
-            executeRandom();
+            needRandomExec = true;  // ★ 後で実行
             break;
 
-        // ---------------------------------------------
-        // Volume（マスター音量） CC7
-        // ---------------------------------------------
         case 7:
             ccVolume = val;
             masterVolume = (float)val / 127.0f;
-
-            // ★ Core1 にも送る（ch=0でOK）
             midi_bridge_send_cc(7, val, 0);
             break;
 
         case 30:
-            // ★ TouchOSC ガチャボタン
             programA = random(0, 17);
             programB = random(0, 17);
             programC = random(0, 17);
             programD = random(0, 17);
 
-            // A
-            if (programA == 16) muteA = true;
-            else { muteA = false; midi_bridge_send_cc(120, programA, 0); }
-
-            // B
-            if (programB == 16) muteB = true;
-            else { muteB = false; midi_bridge_send_cc(120, programB, 1); }
-
-            // C
-            if (programC == 16) muteC = true;
-            else { muteC = false; midi_bridge_send_cc(120, programC, 2); }
-
-            // D
-            if (programD == 16) muteD = true;
-            else { muteD = false; midi_bridge_send_cc(120, programD, 3); }
-
-            drawProgramInfo();
+            needRandomExec = true;  // ★ ここ変更
+            uiNeedUpdate = true;
             break;
 
         case 31:
-            // ★ TouchOSC リセットボタン
-            programA = 1;
-            programB = 6;
-            programC = 14;
-            programD = 7;
-
-            // ★ ミュートも全解除
-            muteA = false;
-            muteB = false;
-            muteC = false;
-            muteD = false;
-
-            // ★ 音色を Core1 に再送信して同期
-            midi_bridge_send_cc(120, programA, 0);
-            midi_bridge_send_cc(120, programB, 1);
-            midi_bridge_send_cc(120, programC, 2);
-            midi_bridge_send_cc(120, programD, 3);
-
-            drawProgramInfo();
+            resetAllParts();
+            uiNeedUpdate = true;
             break;
 
         case 32:
-            // ★ TouchOSC ミュートランダム
-            muteA = (random(0, 2) == 0);
-            muteB = (random(0, 2) == 0);
-            muteC = (random(0, 2) == 0);
-            muteD = (random(0, 2) == 0);
-
-            // ★ ミュート解除されたパートは音色を再送信して同期
-            if (!muteA) midi_bridge_send_cc(120, programA, 0);
-            if (!muteB) midi_bridge_send_cc(120, programB, 1);
-            if (!muteC) midi_bridge_send_cc(120, programC, 2);
-            if (!muteD) midi_bridge_send_cc(120, programD, 3);
-
-            drawProgramInfo();
+            muteA = (random(0,2)==0);
+            muteB = (random(0,2)==0);
+            muteC = (random(0,2)==0);
+            muteD = (random(0,2)==0);
+            uiNeedUpdate = true;
             break;
 
-            
-            // --- 既存処理ここまで ---
-
-         default:
-             handleGeneralCC(cc, val, ch);
-             break;
-
+        default:
+            handleGeneralCC(cc, val, ch);
+            break;
     }
-    // ★ CC を受け取ったら手動モードに入る
-    manualMode = true;
-    manualModeTimeout = millis() + 20000;  // ★ 20秒間は手動モード扱い
 
-    drawCCValue(cc, val);
+    uiNeedUpdate = true;
+
+    manualMode = true;
+    manualModeTimeout = millis() + 20000;
 }
+
 
 void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
     // UI用CCはスキップ
@@ -846,25 +809,16 @@ void usb_send_note_off(uint8_t note, uint8_t ch) {
 inline void midi_bridge_send_note_on(uint8_t note, uint8_t vel, uint8_t ch=0){
     MidiEvent ev{EV_NOTE_ON, note, vel, ch};
 
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) {
-            // ★ Core1 への送信が成功した瞬間に USB へも送る
-            usb_send_note_on(note, vel, ch);
-            return;
-        }
-        tight_loop_contents();
+    if (MidiQ::push(ev)) {
+        usb_send_note_on(note, vel, ch);
     }
 }
 
 inline void midi_bridge_send_note_off(uint8_t note, uint8_t ch=0){
     MidiEvent ev{EV_NOTE_OFF, note, 0, ch};
 
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) {
-            usb_send_note_off(note, ch);
-            return;
-        }
-        tight_loop_contents();
+    if (MidiQ::push(ev)) {
+        usb_send_note_off(note, ch);
     }
 }
 
@@ -2067,7 +2021,7 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
-    lcdPrint(106, 135, "v2.0.1", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+    lcdPrint(106, 135, "v2.0.2", COLOR_DARK_GRAY, COLOR_BLACK, 1);
     delay(10000);
 }
 
@@ -2295,15 +2249,14 @@ void arp_update(uint32_t nowMs) {
 unsigned long nextArpChanceTime = 0;
 unsigned long lastStepD = 0;
 
-void loop() {
-    // ★ 安定 MIDI Clock（24ppqn）
-    unsigned long nowMicros = micros();
-    unsigned long clockIntervalMicros = (60000000UL / baseBPM) / 24;
+uint32_t getClockIntervalMicros() {
+    float bpm = (float)stepBPM;
+    if (bpm < 30.0f) bpm = 30.0f;
 
-    if (nowMicros - lastClockMicros >= clockIntervalMicros) {
-        lastClockMicros += clockIntervalMicros;  // ← これが最重要（揺れゼロ）
-        usb_midi.write(0xF8);  // MIDI Clock
-    }
+    return (uint32_t)((60000000.0f / bpm) / 24.0f);
+}
+
+void loop() {
 
     // manualMode 中はサイレンスを強制解除
     if (manualMode) {
@@ -2832,5 +2785,25 @@ void loop() {
         drawUI();
         drawNoteDots(); 
         lastUI = now;
+    }
+
+    // ================================
+    // ★ 重い処理を後回し（最重要）
+    // ================================
+    if (needRandomExec) {
+        executeRandom();
+        needRandomExec = false;
+    }
+
+    // ================================
+    // ★ UI更新（最大20Hz）
+    // ================================
+    if (uiNeedUpdate && millis() - lastUiUpdateMs > 50) {
+
+        drawProgramInfo();
+        drawCCValue(lastCC, lastCCVal);
+
+        lastUiUpdateMs = millis();
+        uiNeedUpdate = false;
     }
 }
