@@ -54,10 +54,19 @@ inline void synth_note_on_core1(uint8_t note,uint8_t vel,uint8_t ch=0){
     // ここまで来たら諦めて捨てる（アルペジオの時間軸を優先）
 }
 
+/*
 inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
     MidiEvent ev{EV_NOTE_OFF,note,0,ch};
     for (int i = 0; i < 100; i++) {
         if (MidiQ::push(ev)) return;
+        tight_loop_contents();
+    }
+}
+*/
+
+inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
+    MidiEvent ev{EV_NOTE_OFF,note,0,ch};
+    while (!MidiQ::push(ev)) {
         tight_loop_contents();
     }
 }
@@ -713,10 +722,17 @@ bool noteIsOnD = false;
 uint8_t lastNoteD = 0;
 unsigned long noteOffTimeD = 0;
 
+bool picoLedFlash = false;
+unsigned long picoLedOffMicros = 0;
 // -----------------------------------------------------
 // MIDI CC 受信
 // -----------------------------------------------------
 void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
+
+    // ★ LED フラッシュ開始（500µs）
+    digitalWrite(25, HIGH);
+    picoLedFlash = true;
+    picoLedOffMicros = micros() + 1000;   // ← 500µs（0.5ms）
 
     // ★ CCスロットリング（100Hz制限）
     if (millis() - lastCCTime < 10) return;
@@ -740,6 +756,8 @@ void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
         case 22:
             ccSpeed = val;
             speedMul = map(val, 0, 127, 50, 200) / 100.0f;
+            // ★ テンポ変更時にアルペジオのステップを即リセット
+            g_arp.nextStepMs = millis();
             break;
 
         case 23:
@@ -2198,6 +2216,9 @@ void setup() {
 
   usb_midi.begin();  
 
+  pinMode(25, OUTPUT);   // ★ Pico2 LED の初期化
+  digitalWrite(25, LOW); // 初期状態は消灯
+
   multicore_launch_core1(core1_main);
 
   lcdInit();
@@ -2556,6 +2577,12 @@ void loop() {
     // =====================================================
     readButtons();
     readJoystick();
+    
+    // ★ LED フラッシュ消灯（micros() 版） 
+    if (picoLedFlash && micros() >= picoLedOffMicros) {
+        digitalWrite(25, LOW);
+        picoLedFlash = false;
+    }
 
     // =====================================================
     // 呼吸 BPM / 自動トランスポーズ
