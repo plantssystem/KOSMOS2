@@ -54,16 +54,6 @@ inline void synth_note_on_core1(uint8_t note,uint8_t vel,uint8_t ch=0){
     // ここまで来たら諦めて捨てる（アルペジオの時間軸を優先）
 }
 
-/*
-inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
-    MidiEvent ev{EV_NOTE_OFF,note,0,ch};
-    for (int i = 0; i < 100; i++) {
-        if (MidiQ::push(ev)) return;
-        tight_loop_contents();
-    }
-}
-*/
-
 inline void synth_note_off_core1(uint8_t note,uint8_t ch=0){
     MidiEvent ev{EV_NOTE_OFF,note,0,ch};
     while (!MidiQ::push(ev)) {
@@ -472,9 +462,6 @@ bool btnDown = false;
 
 bool btnSW = false;
 
-// ★ 起動時アルペジオ再生済みフラグ
-bool startupArpDone = false;
-
 unsigned long autoModeTimer = 0;
 
 unsigned long noteOffTime = 0;   // ノートを止める時刻
@@ -724,18 +711,22 @@ unsigned long noteOffTimeD = 0;
 
 bool picoLedFlash = false;
 unsigned long picoLedOffMicros = 0;
+
 // -----------------------------------------------------
-// MIDI CC 受信
+// ★ 最適化版 handleCC()
+//   ・テンポが遅くならない
+//   ・UI が詰まらない
+//   ・TouchOSC の高速 CC に完全対応
 // -----------------------------------------------------
 void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
 
-    // ★ LED フラッシュ開始（500µs）
+    // ★ LED フラッシュ（超軽量化）
     digitalWrite(25, HIGH);
     picoLedFlash = true;
-    picoLedOffMicros = micros() + 1000;   // ← 500µs（0.5ms）
+    picoLedOffMicros = micros() + 800;   // 0.8ms
 
-    // ★ CCスロットリング（100Hz制限）
-    if (millis() - lastCCTime < 10) return;
+    // ★ CC スロットリング（10ms → 2ms）
+    if (millis() - lastCCTime < 2) return;
     lastCCTime = millis();
 
     lastCC = cc;
@@ -743,102 +734,141 @@ void handleCC(uint8_t cc, uint8_t val, uint8_t ch) {
 
     switch (cc) {
 
+        // -------------------------
+        // CC20 Density
+        // -------------------------
         case 20:
             ccDensity = val;
             mainDensity = map(val, 0, 127, 0, 100);
             break;
 
+        // -------------------------
+        // CC21 Pitch Offset
+        // -------------------------
         case 21:
             ccPitch = val;
             pitchOffset = map(val, 0, 127, -24, +24);
             break;
 
+        // -------------------------
+        // CC22 Speed
+        // （★テンポ乱れ防止：nextStepMs を書き換えない）
+        // -------------------------
         case 22:
             ccSpeed = val;
             speedMul = map(val, 0, 127, 50, 200) / 100.0f;
-            // ★ テンポ変更時にアルペジオのステップを即リセット
-            g_arp.nextStepMs = millis();
             break;
 
+        // -------------------------
+        // CC23 Scale
+        // （重い処理は後で実行）
+        // -------------------------
         case 23:
             ccScale = val;
-            pendingScale = -1;
-            scaleMode = val % 3;
-
-            needRandomExec = true;  // ★ 後で実行
+            pendingScale = val % 3;
+            needRandomExec = true;   // 後で実行
+            uiNeedUpdate = true;
             break;
 
+        // -------------------------
+        // CC7 Volume
+        // -------------------------
         case 7:
             ccVolume = val;
             masterVolume = (float)val / 127.0f;
             midi_bridge_send_cc(7, val, 0);
             break;
 
+        // -------------------------
+        // CC30 ランダム音色
+        // （重い処理 → 後で実行）
+        // -------------------------
         case 30:
             programA = random(0, 17);
             programB = random(0, 17);
             programC = random(0, 17);
             programD = random(0, 17);
 
-            // ---- A ----
-            if (programA == 16) {
-                muteA = true;
-            } else {
-                muteA = false;
-                midi_bridge_send_cc(120, programA, 0);
-            }
+            // mute 判定だけ即時
+            muteA = (programA == 16);
+            muteB = (programB == 16);
+            muteC = (programC == 16);
+            muteD = (programD == 16);
 
-            // ---- B ----
-            if (programB == 16) {
-                muteB = true;
-            } else {
-                muteB = false;
-                midi_bridge_send_cc(120, programB, 1);
-            }
-
-            // ---- C ----
-            if (programC == 16) {
-                muteC = true;
-            } else {
-                muteC = false;
-                midi_bridge_send_cc(120, programC, 2);
-            }
-
-            // ---- D ----
-            if (programD == 16) {
-                muteD = true;
-            } else {
-                muteD = false;
-                midi_bridge_send_cc(120, programD, 3);
-            }
-
-            uiNeedUpdate = true;
+            // Core1 への送信は後で
+            needRandomExec = true;
             break;
 
+        // -------------------------
+        // CC31 Reset
+        // （重いので後で実行）
+        // -------------------------
         case 31:
-            resetAllParts();
-            uiNeedUpdate = true;
+            pendingPatternChange = true;
+            needRandomExec = true;
             break;
 
+        // -------------------------
+        // CC32 ランダム Mute
+        // -------------------------
         case 32:
             muteA = (random(0,2)==0);
             muteB = (random(0,2)==0);
             muteC = (random(0,2)==0);
             muteD = (random(0,2)==0);
-            uiNeedUpdate = true;
             break;
 
+        // -------------------------
+        // その他の CC → Core1 へパススルー
+        // -------------------------
         default:
             handleGeneralCC(cc, val, ch);
             break;
     }
 
+    // UI 更新は “後でまとめて”
     uiNeedUpdate = true;
 
+    // マニュアルモード
     manualMode = true;
     manualModeTimeout = millis() + 20000;
 }
 
+// -----------------------------------------------------
+// ★ CC の重い処理を後でまとめて実行する
+// -----------------------------------------------------
+void processDeferredActions() {
+
+    // ---- スケール変更 ----
+    if (pendingScale >= 0) {
+        scaleMode = pendingScale;
+        pendingScale = -1;
+    }
+
+    // ---- 音色ランダム（CC30） ----
+    if (needRandomExec) {
+
+        // A
+        if (!muteA) midi_bridge_send_cc(120, programA, 0);
+
+        // B
+        if (!muteB) midi_bridge_send_cc(120, programB, 1);
+
+        // C
+        if (!muteC) midi_bridge_send_cc(120, programC, 2);
+
+        // D
+        if (!muteD) midi_bridge_send_cc(120, programD, 3);
+
+        needRandomExec = false;
+    }
+
+    // ---- リセット（CC31） ----
+    if (pendingPatternChange) {
+        resetAllParts();
+        pendingPatternChange = false;
+    }
+}
 
 void handleGeneralCC(uint8_t cc, uint8_t val, uint8_t ch) {
     // UI用CCはスキップ
@@ -876,23 +906,17 @@ inline void midi_bridge_send_note_off(uint8_t note, uint8_t ch=0){
 }
 
 void resetAllParts() {
+    /*
+    programA = 1;
+    programB = 6;
+    programC = 14;
+    programD = 7;
+    */
 
-    // ★ 初回起動だけ 6 番にする
-    if (!startupArpDone) {
-        programA = 6;
-        programB = 6;
-        programC = 6;
-        programD = 6;
-
-        startupArpDone = true;  // ★ 次回以降は通常の初期値へ
-    }
-    else {
-        // ★ 2回目以降は従来の初期値
-        programA = 1;
-        programB = 6;
-        programC = 14;
-        programD = 7;
-    }
+    programA = 6;
+    programB = 6;
+    programC = 6;
+    programD = 6;
 
     // ★ ミュート解除
     muteA = false;
@@ -2501,6 +2525,8 @@ void loop() {
         manualMode = false;
     }
 
+    processDeferredActions();
+
     static unsigned long lastFrame = 0;
     unsigned long now_us = micros();
     if (now_us - lastFrame < 300) return;
@@ -2577,7 +2603,7 @@ void loop() {
     // =====================================================
     readButtons();
     readJoystick();
-    
+
     // ★ LED フラッシュ消灯（micros() 版） 
     if (picoLedFlash && micros() >= picoLedOffMicros) {
         digitalWrite(25, LOW);
