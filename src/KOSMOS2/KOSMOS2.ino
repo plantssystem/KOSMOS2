@@ -493,6 +493,7 @@ unsigned long lastMainStepTime = 0;
 unsigned long nextSilenceTime = 0;
 int mainPattern[16];   // 0 = 休符, 1 = 鳴く
 bool pendingPatternChange = false;
+uint8_t prevO[16] = {0};
 
 uint16_t bpmColor = COLOR_GREEN;   // Start時は白、Stop時は赤
 
@@ -712,6 +713,48 @@ unsigned long noteOffTimeD = 0;
 bool picoLedFlash = false;
 unsigned long picoLedOffMicros = 0;
 
+void usb_send_cc(uint8_t cc, uint8_t val, uint8_t ch) {
+    uint8_t msg[3] = {
+        uint8_t(0xB0 | (ch & 0x0F)),  // CCステータス
+        cc,                           // CC番号
+        val                           // 値
+    };
+    usb_midi.write(msg, 3);
+}
+
+// CC の前回値を保持する（変化したときだけ送る）
+static uint8_t lastCCStep[128];  // CC20〜CC35を使うなら十分
+
+void usb_send_cc_safe(uint8_t cc, uint8_t value, bool force_send) {
+
+    if (!force_send && lastCCStep[cc] == value) return;
+
+    lastCCStep[cc] = value;
+
+    // ★ ch=4 に送る（RGBPad 用）
+    usb_send_cc(cc, value, 4);
+
+    //sleep_ms(1);
+}
+
+int prev_cc[16] = { -1 };
+
+// 変化したときだけ CC を送るヘルパー
+void send_cc_if_changed(uint8_t cc, uint8_t value, int index) {
+    static uint8_t prev_val[16] = {0};
+
+    if (prev_val[index] != value) {
+        usb_send_cc_safe(cc, value, true);
+        prev_val[index] = value;
+
+        // ★ ログはここ（差分の中）に置くことが絶対条件
+        Serial.print("SEND CC ");
+        Serial.print(cc);
+        Serial.print(" = ");
+        Serial.println(value);
+    }
+}
+
 // -----------------------------------------------------
 // ★ 最適化版 handleCC()
 //   ・テンポが遅くならない
@@ -846,6 +889,7 @@ void processDeferredActions() {
     }
 
     // ---- 音色ランダム（CC30） ----
+    
     if (needRandomExec) {
 
         // A
@@ -860,9 +904,9 @@ void processDeferredActions() {
         // D
         if (!muteD) midi_bridge_send_cc(120, programD, 3);
 
-        needRandomExec = false;
+        //needRandomExec = false;
     }
-
+ 
     // ---- リセット（CC31） ----
     if (pendingPatternChange) {
         resetAllParts();
@@ -1663,7 +1707,7 @@ bool updateEuclidEdit() {
 //      2 = 両方ランダム
 // =====================================================
 void executeRandom() {
-
+/*
     // -----------------------------------------
     // ★ Euclid（リズム）→ 全モードで鳴く密度を統一
     // -----------------------------------------
@@ -1705,10 +1749,11 @@ void executeRandom() {
     // -----------------------------------------
     int density = mainPatternDensity[scaleMode];  // ★ スケールごとの密度
 
-    for (int i = 0; i < 16; i++) {
-      int r = random(0, 100);
-      mainPattern[i] = (r < density ? 1 : 0);
-    }
+    //for (int i = 0; i < 16; i++) {
+    //  int r = random(0, 100);
+    //  mainPattern[i] = (r < density ? 1 : 0);
+    //}
+*/
 }
 
 // ---- 音名テーブル（シャープ表記）----
@@ -2217,7 +2262,7 @@ int findNearestDegree(uint8_t note, const uint8_t* sc, int scSize, int transpose
 void drawSplash() {
     lcdFill(COLOR_BLACK);
     lcdPrint(62, 100, "KOSMOS2", COLOR_WHITE, COLOR_BLACK, 3);
-    lcdPrint(106, 135, "v2.0.6", COLOR_DARK_GRAY, COLOR_BLACK, 1);
+    lcdPrint(106, 135, "v2.1.1", COLOR_DARK_GRAY, COLOR_BLACK, 1);
     delay(10000);
 }
 
@@ -2292,6 +2337,10 @@ void setup() {
 
   masterVolume = 0.5f;
   midi_bridge_send_cc(7, 64, 0);
+
+  for (int i = 0; i < 16; i++) {
+    prob[i] = random(20, 80);
+  }
 }
 
 // ★ アルペジオ終了後に即メインへ吸着させるフラグ
@@ -2458,11 +2507,174 @@ uint32_t getClockIntervalMicros() {
     return (uint32_t)((60000000.0f / bpm) / 24.0f);
 }
 
+// =====================================================
+// グローバル
+// =====================================================
+int kosmosMode = 1;        // 1=PAD同期モード, 2=補間モード
+
+char rxLine[128];
+int rxPos = 0;
+
+void readUsbCommands() {
+    while (Serial.available()) {
+        char c = Serial.read();
+
+        if (c == '\r') continue;   // 完全除去
+
+        if (c == '\n') {
+            rxLine[rxPos] = 0;
+
+            // ★ 行末のスペースも除去
+            while (rxPos > 0 && (rxLine[rxPos-1] == ' ')) {
+                rxLine[--rxPos] = 0;
+            }
+
+            Serial.print("[DBG] USB LINE = '");
+            Serial.print(rxLine);
+            Serial.println("'");
+
+            handleUsbCommand(rxLine);
+            rxPos = 0;
+        } else {
+            if (rxPos < sizeof(rxLine) - 1) {
+                rxLine[rxPos++] = c;
+            }
+        }
+    }
+}
+
+void sendPatternNow() {
+
+    // ★ まず現在ステップを送る
+    char sbuf[32];
+    sprintf(sbuf, "S:%d\n", currentStep);
+    Serial.print(sbuf);
+
+    // CC20（ステップ番号）
+    char buf[32];
+    sprintf(buf, "CC20:%d\n", currentStep);
+    Serial.print(buf);
+
+    // CC21〜36（パターン）
+    char cbuf[256];
+    int idx = 0;
+    idx += sprintf(cbuf + idx, "CC:");
+    for (int i = 0; i < 16; i++) {
+        uint8_t value = mainPattern[i] ? 127 : 0;
+        idx += sprintf(cbuf + idx, "%d=%d", 21 + i, value);
+        if (i < 15) idx += sprintf(cbuf + idx, ",");
+    }
+    idx += sprintf(cbuf + idx, "\n");
+    Serial.print(cbuf);
+
+    // O:
+    char obuf[128];
+    idx = 0;
+    idx += sprintf(obuf + idx, "O:");
+    for (int i = 0; i < 16; i++) {
+        idx += sprintf(obuf + idx, "%d", mainPattern[i] ? 1 : 0);
+        if (i < 15) idx += sprintf(obuf + idx, ",");
+    }
+    idx += sprintf(obuf + idx, "\n");
+    Serial.print(obuf);
+}
+
+// =====================================================
+// MODE コマンド処理
+// =====================================================
+void handleUsbCommand(const char* line)
+{
+    Serial.print("[DBG] handleUsbCommand got: '");
+    Serial.print(line);
+    Serial.println("'");
+
+    if (strncmp(line, "MODE = 1", 8) == 0) {
+        kosmosMode = 1;
+
+        mainSilenceActive = false;
+        currentStep = 0;
+        Serial.println("S:0");
+
+        // ★ STEP1 固まり対策
+        for (int i = 0; i < 16; i++) prevO[i] = 255;
+
+        sendPatternNow();
+
+        Serial.println("[DBG] MODE1 accepted + pattern restored");
+        return;
+    }
+
+if (strncmp(line, "MODE = 2", 8) == 0) {
+    kosmosMode = 2;
+
+    // ★ currentStep はリセットしない
+
+    // ★ MODE2 accepted の直後に “現在ステップ” をもう一度送る
+    char sbuf[32];
+    sprintf(sbuf, "S:%d\n", currentStep);
+    Serial.print(sbuf);
+
+    Serial.println("[DBG] MODE2 accepted");
+    return;
+}
+
+
+
+  if (strncmp(line, "REQ_PATTERN", 11) == 0) {
+
+    // ★ 現在ステップを必ず送る
+    char sbuf[32];
+    sprintf(sbuf, "S:%d\n", currentStep);
+    Serial.print(sbuf);
+
+    // CC20（ステップ番号）
+    char buf[32];
+    sprintf(buf, "CC20:%d\n", currentStep);
+    Serial.print(buf);
+
+    // CC21〜36（パターン）
+    char cbuf[256];
+    int idx = 0;
+    idx += sprintf(cbuf + idx, "CC:");
+    for (int i = 0; i < 16; i++) {
+        uint8_t value = mainPattern[i] ? 127 : 0;
+        idx += sprintf(cbuf + idx, "%d=%d", 21 + i, value);
+        if (i < 15) idx += sprintf(cbuf + idx, ",");
+    }
+    idx += sprintf(cbuf + idx, "\n");
+    Serial.print(cbuf);
+
+    // O:
+    char obuf[128];
+    idx = 0;
+    idx += sprintf(obuf + idx, "O:");
+    for (int i = 0; i < 16; i++) {
+        idx += sprintf(obuf + idx, "%d", mainPattern[i] ? 1 : 0);
+        if (i < 15) idx += sprintf(obuf + idx, ",");
+    }
+    idx += sprintf(obuf + idx, "\n");
+    Serial.print(obuf);
+
+    Serial.println("[DBG] Pattern sent");
+    return;
+  }
+
+}
+
+
+
+unsigned long lastStepTime = 0;
+int stepInterval = 100;   // Speed に応じて変化
+static int barCount = 0;     // 現在の小節数
+static int barTarget = 1;    // 次の更新までの小節数（初期値は1）
+static bool prevSilence = false;
+
 void loop() {
+    readUsbCommands();       // ★ MODE コマンド受信
 
     tud_task();              // USB処理
     usb_midi.flush();        // MIDI送信バッファを流す
-
+    
     // -----------------------------------------------------
     // ★ Android 向け KeepAlive パケット（100msごと）
     // -----------------------------------------------------
@@ -2478,9 +2690,9 @@ void loop() {
     }
 
     // manualMode 中はサイレンスを強制解除
-    if (manualMode) {
-        mainSilenceActive = false;
-    }
+    //if (manualMode) {
+    //    mainSilenceActive = false;
+    //}
     
     // =====================================================
     // ★ USB MIDI 受信（Adafruit_USBD_MIDI 用）
@@ -2529,7 +2741,7 @@ void loop() {
 
     static unsigned long lastFrame = 0;
     unsigned long now_us = micros();
-    if (now_us - lastFrame < 300) return;
+    //if (now_us - lastFrame < 300) return;
     lastFrame = now_us;
 
     // 2回目は再宣言せず、代入だけにする
@@ -2574,29 +2786,35 @@ void loop() {
         // アルペジオも強制停止
         if (g_arp.active) {
             arp_stop();
+
+            // ★ アルペジオ停止時のUSBフリーズ防止
+            uint8_t dummy[3] = {0x80, 0x00, 0x00};
+            usb_midi.write(dummy, 3);
+            usb_midi.flush();
         }
 
         mainSilenceDuration = now + random(5000, 8000);
     }
 
-    // =====================================================
-    // メインサイレンス制御（終了）
-    // =====================================================
-    if (!manualMode && mainSilenceActive && now >= mainSilenceDuration) {
+// =====================================================
+// メインサイレンス制御（終了）
+// =====================================================
+if (!manualMode && mainSilenceActive &&
+    (long)(millis() - mainSilenceDuration) >= 0) {
 
-        mainSilenceActive = false;
-        
-        // ★ ここでパターン更新を必ず行う
-        currentPattern = random(0, 6);
-        memcpy(mainPattern, rhythmPatterns[currentPattern], sizeof(mainPattern));
+    mainSilenceActive = false;
 
-        arp_start(60 + transpose + pitchOffset, scaleMode, stepBPM);
-        executeRandom();
-        
-        if (!manualMode) {
-            nextMainSilenceTime = now + random(30000, 50000);
-        }
-    }
+    // ★ パターン再生成
+    currentPattern = random(0, 6);
+    memcpy(mainPattern, rhythmPatterns[currentPattern], sizeof(mainPattern));
+
+    // ★ アルペジオ再開
+    arp_start(60 + transpose, scaleMode, stepBPM);
+    executeRandom();
+
+    // ★ 次のサイレンス予約
+    nextMainSilenceTime = millis() + random(30000, 50000);
+}
 
     // =====================================================
     // 入力
@@ -2673,22 +2891,103 @@ void loop() {
         }
     }
 
-    // =====================================================
-    // Aパート　メインステップ（8分 × 16）
-    // =====================================================
-    interval = 60000UL / max(stepBPM, 30) / 4;
- 
-    if (now - lastMainStepTime >= interval) {
-        lastMainStepTime = now;
-        currentStep = (currentStep + 1) % 16;
+//20260818
+// =====================================================
+// 完全同期ステップエンジン
+// =====================================================
+interval = 60000UL / max(stepBPM, 30) / 4;
 
-        // メインパターン更新（無音中は上書きしない）
-        if (currentStep == 0 && !mainSilenceActive) {
-             currentPattern = random(0, 6);
-            memcpy(mainPattern, rhythmPatterns[currentPattern], sizeof(mainPattern));
+if (now - lastMainStepTime >= interval) {
+
+    lastMainStepTime = now;
+
+    // 1) currentStep は常に進める
+    currentStep = (currentStep + 1) % 16;
+
+    // 2) S: は常に送る（mode1/mode2 共通）
+    {
+        char buf[32];
+        sprintf(buf, "S:%d\n", currentStep);
+        Serial.print(buf);
+    }
+
+    // =====================================================
+    // mode1 のときだけ CC/O: を送る
+    // =====================================================
+    if (kosmosMode == 1) {
+
+        // --- サイレンス時の O: ---
+        if (mainSilenceActive && !prevSilence) {
+            Serial.println("O:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0");
+            prevSilence = true;
+        }
+        if (!mainSilenceActive && prevSilence) {
+            prevSilence = false;
         }
 
-        // ★ アルペジオ中はメインを鳴らさない
+        // --- CC20 ---
+        if (!mainSilenceActive) {
+            char buf[32];
+            sprintf(buf, "CC20:%d\n", currentStep);
+            Serial.print(buf);
+        }
+
+        // --- STEP0 のときだけ CC21〜36 ---
+        if (!mainSilenceActive && currentStep == 0) {
+
+            barCount++;
+
+            if (barCount >= barTarget) {
+                currentPattern = random(0, RHYTHM_PATTERN_COUNT);
+                memcpy(mainPattern, rhythmPatterns[currentPattern], sizeof(mainPattern));
+
+                for (int i = 0; i < 16; i++) {
+                    prob[i] = random(20, 80);
+                }
+
+                barCount = 0;
+                barTarget = random(1, 5);
+            }
+
+            char cbuf[256];
+            int idx = 0;
+            idx += sprintf(cbuf + idx, "CC:");
+            for (int i = 0; i < 16; i++) {
+                uint8_t value = mainPattern[i] ? 127 : 0;
+                idx += sprintf(cbuf + idx, "%d=%d", 21 + i, value);
+                if (i < 15) idx += sprintf(cbuf + idx, ",");
+            }
+            idx += sprintf(cbuf + idx, "\n");
+            Serial.print(cbuf);
+        }
+
+        // --- O: 更新 ---
+        bool changed = false;
+
+        for (int i = 0; i < 16; i++) {
+            uint8_t v = mainPattern[i] ? 1 : 0;
+            if (prevO[i] != v) {
+                changed = true;
+                prevO[i] = v;
+            }
+        }
+
+        if (!mainSilenceActive && changed) {
+            char obuf[128];
+            int idx = 0;
+            idx += sprintf(obuf + idx, "O:");
+            for (int i = 0; i < 16; i++) {
+                idx += sprintf(obuf + idx, "%d", prevO[i]);
+                if (i < 15) idx += sprintf(obuf + idx, ",");
+            }
+            idx += sprintf(obuf + idx, "\n");
+            Serial.print(obuf);
+        }
+    }
+
+    // =====================================================
+    // 6) アルペジオ中はメインを鳴らさない
+    // =====================================================
         if (!g_arp.active) {
 
             // NoteOff
@@ -2698,12 +2997,12 @@ void loop() {
             }
 
             // ★ パターン × 発音率（density）
-            bool shouldPlay =
-                ((!mainSilenceActive) || manualMode) &&
-                (!muteA) &&
-                (mainPattern[currentStep] == 1) &&
-                (random(0, 100) < mainDensity);
-
+bool shouldPlay =
+    (!mainSilenceActive) &&        // ★ サイレンス優先
+    (!muteA) &&
+    (mainPattern[currentStep] == 1) &&
+    (random(0, 100) < mainDensity);
+    
             if (shouldPlay) {
 
                 // ---- 素直な上昇下降だけにする ----
@@ -2768,7 +3067,8 @@ void loop() {
             }
 
             // ★ B パートの発音条件
-            if (!muteB &&
+            if (!mainSilenceActive &&      // ★ 追加
+                !muteB &&
                 rhythmBPatterns[currentBPattern][currentStep] == 1 &&
                 (random(0, 100) < mainDensity)) {
 
@@ -2810,7 +3110,7 @@ void loop() {
                 triggerC = true;
             }
 
-            if (triggerC && !muteC && (random(0,100) < mainDensity)) {
+            if (!mainSilenceActive && triggerC && !muteC && (random(0,100) < mainDensity)) {
 
                 // ---- スケール取得 ----
                 const uint8_t* sc;
@@ -2897,108 +3197,110 @@ void loop() {
         drawTopText();
     }
 
-    // =================================================
-    // D パート（和風で控えめな 16分アルペジオ）
-    // =================================================
-    static unsigned long lastStepD = 0;
+// =================================================
+// D パート（和風で控えめな 16分アルペジオ）
+// =================================================
+static unsigned long lastStepD = 0;
 
-    if (now - lastStepD >= interval) {
-        lastStepD = now;
+if (now - lastStepD >= interval) {
+    lastStepD = now;
 
-        // ★ 休止モードでは停止
-        if (mainSilenceActive) {
-            if (noteIsOnD) {
-                midi_bridge_send_note_off(lastNoteD, 3);
-                noteIsOnD = false;
-            }
-            return;
+    // ★ 休止モードでは停止
+    if (mainSilenceActive) {
+        if (noteIsOnD) {
+            midi_bridge_send_note_off(lastNoteD, 3);
+            noteIsOnD = false;
         }
-
-        // ★ density（控えめ）
-        if (random(0,100) >= mainDensity * 0.6) {   // 60% だけ反映
-            if (noteIsOnD) {
-                midi_bridge_send_note_off(lastNoteD, 3);
-                noteIsOnD = false;
-            }
-            return;
-        }
-
-        if (!muteD) {
-
-            // ---- スケール取得 ----
-            const uint8_t* sc;
-            int scSize;
-            if (scaleMode == 0) { sc = SCALE_HEI;   scSize = SCALE_HEI_SIZE; }
-            else if (scaleMode == 1) { sc = SCALE_MIYA;  scSize = SCALE_MIYA_SIZE; }
-            else if (scaleMode == 2) { sc = SCALE_INSEN; scSize = SCALE_INSEN_SIZE; }
-            else { sc = SCALE_PENTA; scSize = SCALE_PENTA_SIZE; }
-
-            // =================================================
-            // ★ 和風ロジック：小さな“揺れ”を中心にする
-            // =================================================
-
-            if (dPhraseRemain <= 0) {
-                dPhraseRemain = random(3, 6);      // 短いフレーズ
-                dGoingUp = (random(0,100) < 50);
-            }
-
-            // ---- 和風の揺れ：±1 を中心にする ----
-            int r = random(0,100);
-            if (r < 70) {
-                degreeD += (dGoingUp ? 1 : -1);    // 70%：±1
-            }
-            else if (r < 90) {
-                degreeD += (dGoingUp ? 2 : -2);    // 20%：±2
-            }
-            else {
-                degreeD += (random(0,2)==0 ? -3 : 3); // 10%：アクセント
-            }
-
-            // ---- 端で折り返す ----
-            if (degreeD < 2) {
-                degreeD = 2;
-                dGoingUp = true;
-            }
-            if (degreeD >= scSize - 1) {
-                degreeD = scSize - 1;
-                dGoingUp = false;
-            }
-
-            dPhraseRemain--;
-
-            // ---- C パートに寄り添う（控えめ）----
-            if (random(0,100) < 25) {
-                degreeD = max(0, degreeC - 1);   // C より少し下
-            }
-
-            // ---- ノート番号 ----
-            uint8_t note = 72 + transpose + pitchOffset + sc[degreeD];
-
-            // ---- 前の音を止める ----
-            if (noteIsOnD) {
-                midi_bridge_send_note_off(lastNoteD, 3);
-                noteIsOnD = false;
-            }
-
-            // ---- 発音（かなり控えめ）----
-            int velD = 28 * (mainDensity / 100.0f);
-            velD = max(5, velD);
-            midi_bridge_send_note_on(note, velD, 3);
-            pushNoteDot(note);
-
-            lastNoteD = note;
-            noteIsOnD = true;
-
-            // ---- NoteOff ----
-            noteOffTimeD = now + (interval * 0.55);  // 少し短め
-        }
+        return;
     }
 
-    // ---- D パート NoteOff ----
-    if (noteIsOnD && now >= noteOffTimeD) {
-        midi_bridge_send_note_off(lastNoteD, 3);
-        noteIsOnD = false;
+    // =====================================================
+    // ★ density（発音確率のみ作用）
+    // =====================================================
+    if (random(0,100) >= mainDensity) {   // ← 100% そのまま反映
+        if (noteIsOnD) {
+            midi_bridge_send_note_off(lastNoteD, 3);
+            noteIsOnD = false;
+        }
+        return;
     }
+
+    if (!muteD) {
+
+        // ---- スケール取得 ----
+        const uint8_t* sc;
+        int scSize;
+        if (scaleMode == 0) { sc = SCALE_HEI;   scSize = SCALE_HEI_SIZE; }
+        else if (scaleMode == 1) { sc = SCALE_MIYA;  scSize = SCALE_MIYA_SIZE; }
+        else if (scaleMode == 2) { sc = SCALE_INSEN; scSize = SCALE_INSEN_SIZE; }
+        else { sc = SCALE_PENTA; scSize = SCALE_PENTA_SIZE; }
+
+        // =================================================
+        // ★ 和風ロジック：小さな“揺れ”を中心にする
+        // =================================================
+
+        if (dPhraseRemain <= 0) {
+            dPhraseRemain = random(3, 6);      // 短いフレーズ
+            dGoingUp = (random(0,100) < 50);
+        }
+
+        // ---- 和風の揺れ：±1 を中心にする ----
+        int r = random(0,100);
+        if (r < 70) {
+            degreeD += (dGoingUp ? 1 : -1);    // 70%：±1
+        }
+        else if (r < 90) {
+            degreeD += (dGoingUp ? 2 : -2);    // 20%：±2
+        }
+        else {
+            degreeD += (random(0,2)==0 ? -3 : 3); // 10%：アクセント
+        }
+
+        // ---- 端で折り返す ----
+        if (degreeD < 2) {
+            degreeD = 2;
+            dGoingUp = true;
+        }
+        if (degreeD >= scSize - 1) {
+            degreeD = scSize - 1;
+            dGoingUp = false;
+        }
+
+        dPhraseRemain--;
+
+        // ---- C パートに寄り添う（控えめ）----
+        if (random(0,100) < 25) {
+            degreeD = max(0, degreeC - 1);   // C より少し下
+        }
+
+        // ---- ノート番号 ----
+        uint8_t note = 72 + transpose + pitchOffset + sc[degreeD];
+
+        // ---- 前の音を止める ----
+        if (noteIsOnD) {
+            midi_bridge_send_note_off(lastNoteD, 3);
+            noteIsOnD = false;
+        }
+
+        // ---- 発音（かなり控えめ）----
+        int velD = 28 * (mainDensity / 100.0f);
+        velD = max(5, velD);
+        midi_bridge_send_note_on(note, velD, 3);
+        pushNoteDot(note);
+
+        lastNoteD = note;
+        noteIsOnD = true;
+
+        // ---- NoteOff ----
+        noteOffTimeD = now + (interval * 0.55);  // 少し短め
+    }
+}
+
+// ---- D パート NoteOff ----
+if (noteIsOnD && now >= noteOffTimeD) {
+    midi_bridge_send_note_off(lastNoteD, 3);
+    noteIsOnD = false;
+}
 
     // =====================================================
     // アルペジオ更新
@@ -3008,13 +3310,14 @@ void loop() {
     // =====================================================
     // UI
     // =====================================================
+   
     static uint32_t lastUI = 0;
     if (now - lastUI >= 16) {
         drawUI();
         drawNoteDots(); 
         lastUI = now;
     }
-
+   
     // ================================
     // ★ 重い処理を後回し（最重要）
     // ================================
@@ -3039,4 +3342,11 @@ void loop() {
     // ★ ループ末尾でも flush（Android 安定化）
     // -----------------------------------------------------
     usb_midi.flush();
+    
+    if (mainSilenceActive) {
+        uint8_t dummy[3] = {0x80, 0x00, 0x00};
+        usb_midi.write(dummy, 3);
+        usb_midi.flush();   // ★ サイレンス中の固まり防止
+    }
+
 }
